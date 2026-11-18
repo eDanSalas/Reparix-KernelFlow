@@ -1,0 +1,107 @@
+# Dependencias y caches de Node.js / Angular
+node_modules/
+.npm/
+.npm-cache/
+.angular/
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# Compilacion, cobertura y resultados de pruebas
+dist/
+build/
+out-tsc/
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
+
+# Variables de entorno: versionar solo la plantilla sin secretos
+.env
+.env.*
+!.env.example
+.envrc
+.npmrc.local
+.netrc
+_netrc
+
+# Credenciales, claves privadas y configuracion local de herramientas
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+/.ssh/
+/.aws/
+/.azure/
+/.kube/
+/.codex/
+/secrets/
+/credentials/
+
+# Datos locales y respaldos (conservar db/*.sql: son migraciones)
+/data/
+/pgdata/
+/backups/
+/dumps/
+*.dump
+*.backup
+*.bak
+*.sql.gz
+*.sql.zip
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Directorios generados por los scripts del proyecto
+/work/
+/artifacts/
+/evidence/*
+!/evidence/README.md
+
+# Logs y diagnosticos de ejecucion
+logs/
+*.log
+*.pid
+*.pid.lock
+report.*.json
+*.heapsnapshot
+*.cpuprofile
+core
+core.[0-9]*
+
+# Python: scripts auxiliares y entornos locales
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Configuracion personal de editores y archivos temporales
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.tmp
+*.temp
+~$*
+
+# Metadatos del sistema operativo
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/

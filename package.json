@@ -1,0 +1,32 @@
+{
+  "name": "reparix-openup",
+  "version": "0.4.0-openup",
+  "private": true,
+  "overrides": {
+    "zod": "4.6.6",
+    "piscina": "5.3.2",
+    "vite": "8.1.6",
+    "@modelcontextprotocol/sdk": "1.32.0"
+  },
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
+  "scripts": {
+    "start": "node --env-file=.env server/src/index.js",
+    "dev:server": "node --env-file=.env --watch server/src/index.js",
+    "dev:client": "npm run start --workspace client",
+    "build": "npm run build --workspace client",
+    "test": "node --test server/test/unit.test.js",
+    "test:integration": "node --env-file=.env --test --test-concurrency=1 server/test/integration.test.js server/test/assignment.integration.test.js server/test/migration.integration.test.js server/test/assessment.integration.test.js server/test/state.integration.test.js",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "user:create": "node --env-file=.env scripts/create-user.mjs",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
+}

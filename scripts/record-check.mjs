@@ -1,0 +1,13 @@
+import {spawn} from 'node:child_process';
+import {mkdir,writeFile} from 'node:fs/promises';
+const [folder,id,executable,...args]=process.argv.slice(2);
+if(!/^evidence\/(continuation|cu02|cu03|cu05)$/.test(folder)||!/^[-a-z0-9]+$/.test(id))throw Error('Use an increment evidence folder and check id');
+await mkdir(folder,{recursive:true});
+const result={command:[executable,...args],startedAt:new Date().toISOString()};
+const child=spawn(executable,args,{stdio:['ignore','pipe','pipe'],shell:false});let output='';
+for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>{output+=chunk;process.stdout.write(chunk);});
+child.on('error',e=>{output+=e.message;});
+const code=await new Promise(resolve=>child.on('close',resolve));
+Object.assign(result,{finishedAt:new Date().toISOString(),exitCode:code,status:code===0?'Finalizado':'Fallido'});
+await writeFile(`${folder}/${id}.log`,output);await writeFile(`${folder}/${id}.json`,JSON.stringify(result,null,2)+'\n');
+process.exitCode=code??1;
