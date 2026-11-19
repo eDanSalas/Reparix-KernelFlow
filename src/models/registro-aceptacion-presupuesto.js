@@ -15,11 +15,15 @@ export class RegistroAceptacionPresupuesto {
       throw new HttpError(422, 'El canal de comunicación es obligatorio.');
     }
 
+    const evidencia = typeof solicitud?.evidencia === 'string' ? solicitud.evidencia.trim() : '';
+    if (!evidencia) {
+      throw new HttpError(422, 'La evidencia de confirmación es obligatoria.');
+    }
+
     await this.controlAcceso.tienePermiso(solicitud.usuario);
     const orden = await this.ordenReparacion.obtenerPorFolio(solicitud.folio);
     const presupuestoVigente = await this.presupuesto.obtenerVigenteComunicado(orden.id);
 
-    const evidencia = typeof solicitud.evidencia === 'string' ? solicitud.evidencia.trim() : solicitud.evidencia;
     const responsable = typeof solicitud.responsable === 'string' ? solicitud.responsable.trim() : solicitud.responsable;
 
     const decision = await this.decisionPresupuesto.guardar({
