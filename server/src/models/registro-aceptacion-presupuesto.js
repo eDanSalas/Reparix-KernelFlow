@@ -1,0 +1,36 @@
+export class RegistroAceptacionPresupuesto {
+  constructor({ controlAcceso, presupuesto, ordenReparacion, decisionPresupuesto, historial } = {}) {
+    this.controlAcceso = controlAcceso;
+    this.presupuesto = presupuesto;
+    this.ordenReparacion = ordenReparacion;
+    this.decisionPresupuesto = decisionPresupuesto;
+    this.historial = historial;
+  }
+
+  async registrar(solicitud) {
+    await this.controlAcceso.tienePermiso(solicitud.usuario);
+    const orden = await this.ordenReparacion.obtenerPorFolio(solicitud.folio);
+    const presupuestoVigente = await this.presupuesto.obtenerVigenteComunicado(orden.id);
+
+    const canal = typeof solicitud.canal === 'string' ? solicitud.canal.trim() : solicitud.canal;
+    const evidencia = typeof solicitud.evidencia === 'string' ? solicitud.evidencia.trim() : solicitud.evidencia;
+    const responsable = typeof solicitud.responsable === 'string' ? solicitud.responsable.trim() : solicitud.responsable;
+
+    const decision = await this.decisionPresupuesto.guardar({
+      ordenId: orden.id,
+      presupuestoId: presupuestoVigente.id,
+      presupuestoRevision: presupuestoVigente.revision,
+      canal,
+      evidencia,
+      responsable,
+    });
+
+    await this.historial.registrar({
+      ordenId: orden.id,
+      autor: solicitud.usuario.id,
+      fechaHora: new Date().toISOString(),
+    });
+
+    return { decision, orden };
+  }
+}
