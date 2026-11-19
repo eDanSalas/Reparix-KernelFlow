@@ -49,11 +49,11 @@ const crearSolicitudValida = (overrides = {}) => ({
   ...overrides,
 });
 
-function crearColaboradores({
-  tienePermiso = true,
-  orden = crearOrdenPendiente(),
-  presupuestoVigente = crearPresupuestoVigente(),
-} = {}) {
+function crearColaboradores(opciones = {}) {
+  const tienePermiso = 'tienePermiso' in opciones ? opciones.tienePermiso : true;
+  const orden = 'orden' in opciones ? opciones.orden : crearOrdenPendiente();
+  const presupuestoVigente =
+    'presupuestoVigente' in opciones ? opciones.presupuestoVigente : crearPresupuestoVigente();
   const controlAcceso = {
     tienePermiso: mock.fn(async () => tienePermiso),
   };

@@ -28,6 +28,9 @@ export class RegistroAceptacionPresupuesto {
     await this.controlAcceso.tienePermiso(solicitud.usuario);
     const orden = await this.ordenReparacion.obtenerPorFolio(solicitud.folio);
     const presupuestoVigente = await this.presupuesto.obtenerVigenteComunicado(orden.id);
+    if (!presupuestoVigente) {
+      throw new HttpError(409, 'No existe un presupuesto vigente para la orden.');
+    }
 
     const decision = await this.decisionPresupuesto.guardar({
       ordenId: orden.id,
