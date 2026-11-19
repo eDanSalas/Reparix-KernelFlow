@@ -20,11 +20,14 @@ export class RegistroAceptacionPresupuesto {
       throw new HttpError(422, 'La evidencia de confirmación es obligatoria.');
     }
 
+    const responsable = typeof solicitud?.responsable === 'string' ? solicitud.responsable.trim() : '';
+    if (!responsable) {
+      throw new HttpError(422, 'El responsable del registro es obligatorio.');
+    }
+
     await this.controlAcceso.tienePermiso(solicitud.usuario);
     const orden = await this.ordenReparacion.obtenerPorFolio(solicitud.folio);
     const presupuestoVigente = await this.presupuesto.obtenerVigenteComunicado(orden.id);
-
-    const responsable = typeof solicitud.responsable === 'string' ? solicitud.responsable.trim() : solicitud.responsable;
 
     const decision = await this.decisionPresupuesto.guardar({
       ordenId: orden.id,
