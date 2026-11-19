@@ -25,8 +25,8 @@ export class RegistroAceptacionPresupuesto {
       throw new HttpError(422, 'El responsable del registro es obligatorio.');
     }
 
-    const autorizado = await this.controlAcceso.tienePermiso(solicitud.usuario);
-    if (solicitud.usuario && !autorizado) {
+    const autorizado = await this.controlAcceso.tienePermiso(solicitud?.usuario);
+    if (!solicitud?.usuario || !autorizado) {
       throw new HttpError(403, 'El usuario no tiene permisos para registrar la aceptación del presupuesto.');
     }
     const orden = await this.ordenReparacion.obtenerPorFolio(solicitud.folio);
