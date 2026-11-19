@@ -1,3 +1,5 @@
+import { HttpError } from '../validation.js';
+
 export class RegistroAceptacionPresupuesto {
   constructor({ controlAcceso, presupuesto, ordenReparacion, decisionPresupuesto, historial } = {}) {
     this.controlAcceso = controlAcceso;
@@ -8,11 +10,15 @@ export class RegistroAceptacionPresupuesto {
   }
 
   async registrar(solicitud) {
+    const canal = typeof solicitud?.canal === 'string' ? solicitud.canal.trim() : '';
+    if (!canal) {
+      throw new HttpError(422, 'El canal de comunicación es obligatorio.');
+    }
+
     await this.controlAcceso.tienePermiso(solicitud.usuario);
     const orden = await this.ordenReparacion.obtenerPorFolio(solicitud.folio);
     const presupuestoVigente = await this.presupuesto.obtenerVigenteComunicado(orden.id);
 
-    const canal = typeof solicitud.canal === 'string' ? solicitud.canal.trim() : solicitud.canal;
     const evidencia = typeof solicitud.evidencia === 'string' ? solicitud.evidencia.trim() : solicitud.evidencia;
     const responsable = typeof solicitud.responsable === 'string' ? solicitud.responsable.trim() : solicitud.responsable;
 
@@ -35,3 +41,4 @@ export class RegistroAceptacionPresupuesto {
     return { decision, orden };
   }
 }
+
