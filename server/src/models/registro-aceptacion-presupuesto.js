@@ -31,6 +31,7 @@ export class RegistroAceptacionPresupuesto {
       fechaHora: new Date().toISOString(),
     });
 
+    // HU01-U02 (CA-3): registrar la aceptación no inicia la reparación ni modifica el estado de la orden automáticamente.
     return { decision, orden };
   }
 }
