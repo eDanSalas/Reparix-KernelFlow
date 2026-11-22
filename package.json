@@ -21,7 +21,7 @@
     "dev:client": "npm run start --workspace client",
     "build": "npm run build --workspace client",
     "test": "node --test server/test/unit.test.js \"server/test/*.unit.test.js\"",
-    "test:integration": "node --env-file=.env --test --test-concurrency=1 server/test/integration.test.js server/test/assignment.integration.test.js server/test/migration.integration.test.js server/test/assessment.integration.test.js server/test/state.integration.test.js",
+    "test:integration": "node --env-file=.env --test --test-concurrency=1 server/test/integration.test.js server/test/assignment.integration.test.js server/test/migration.integration.test.js server/test/assessment.integration.test.js server/test/state.integration.test.js server/test/budget.integration.test.js",
     "db:migrate": "node --env-file=.env scripts/migrate.mjs",
     "user:create": "node --env-file=.env scripts/create-user.mjs",
     "package": "node scripts/package.mjs"

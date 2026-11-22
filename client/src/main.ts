@@ -4,9 +4,11 @@ import {FormsModule} from '@angular/forms';
 type Assignment={id:string;technicianId:string;technicianName:string;assignedAt:string;assignedByName?:string;endedAt:string|null;endedByName?:string};
 type Receipt={folio:string;state:string;version:number;receivedAt:string;clientName:string;phone:string;email:string|null;deviceType:string;brand:string;model:string;serialNumber:string|null;serialUnavailableReason:string|null;reportedFault:string;physicalCondition:string;accessories:string[];history:{author:string;changedAt:string}[];currentAssignment:Assignment|null;assignmentHistory:Assignment[]};
 type Assessment={id:string;revision:number;assignmentId:string;diagnosis:string;proposedWork:string;amount:string;currency:string;note:string;authorName:string;registeredAt:string};
-type AssessmentView={orderVersion:number;state:string;assessments:Assessment[];currentAssessment:Assessment|null;latestAssessment:Assessment|null;authorizationRecorded:boolean};
+type BudgetAcceptance={id:string;assessmentId:string;revision:number;canal:string;evidencia:string;responsable:string;authorName:string;recordedAt:string};
+type AssessmentView={orderVersion:number;state:string;assessments:Assessment[];currentAssessment:Assessment|null;latestAssessment:Assessment|null;authorizationRecorded:boolean;communication:{recordedAt:string}|null;acceptances?:BudgetAcceptance[]};
 type StateView={folio:string;state:string;orderVersion:number;changedAt:string;changedBy:string;allowedTransitions:string[];blockedReason:string;history:{previousState:string|null;state:string;note:string;changedAt:string;author:string}[]};
 const emptyAssessment=()=>({diagnosis:'',proposedWork:'',amount:'',currency:'MXN',note:''});
+const emptyAcceptance=()=>({canal:'',evidencia:'',responsable:''});
 const empty=()=>({clientName:'',phone:'',email:'',deviceType:'',brand:'',model:'',serialNumber:'',serialUnavailableReason:'',reportedFault:'',physicalCondition:'',accessoriesConfirmed:false,physicalCheckConfirmed:false});
 @Component({selector:'app-root',standalone:true,imports:[FormsModule],template:`
 <header><a href="/" class="brand">Reparix<span>Recepción de equipos</span></a>@if(user()){<button class="quiet" (click)="logout()">Cerrar sesión</button>}</header>
@@ -41,6 +43,36 @@ const empty=()=>({clientName:'',phone:'',email:'',deviceType:'',brand:'',model:'
 @if(sv.allowedTransitions.length){<form (ngSubmit)="changeState()" #st="ngForm"><label>Nuevo estado<select name="targetState" [(ngModel)]="targetState" (ngModelChange)="stateConfirmed=false" required [disabled]="busy()||stateNeedsRefresh()"><option value="">Selecciona el siguiente estado</option>@for(s of sv.allowedTransitions;track s){<option [value]="s">{{s}}</option>}</select></label><label>Nota del cambio<input name="stateNote" [(ngModel)]="stateNote" (ngModelChange)="stateConfirmed=false" required minlength="3" maxlength="500" [disabled]="busy()||stateNeedsRefresh()"></label><label class="check"><input name="stateConfirmed" type="checkbox" [(ngModel)]="stateConfirmed" required [disabled]="busy()||stateNeedsRefresh()"> Confirmo el estado seleccionado y la nota.</label><button [disabled]="busy()||st.invalid||stateNeedsRefresh()">Confirmar cambio de estado</button></form>}
 <h3>Historial de estados</h3>@for(h of sv.history;track $index){<p class="state-history">{{h.previousState || 'Alta'}} → {{h.state}} · {{date(h.changedAt)}} · {{h.author}}<br>{{h.note}}</p>}</section>}
 @if(assessmentView();as av){<section class="panel assessment" aria-label="Diagnóstico y presupuesto"><h2>Diagnóstico y presupuesto</h2><p>Versión de orden {{av.orderVersion}} · {{av.currentAssessment ? 'Revisión vigente: '+av.currentAssessment.revision : 'Sin revisión de la asignación vigente'}}</p><p class="muted">{{av.authorizationRecorded ? 'Presupuesto autorizado.' : 'Presupuesto sin autorización registrada.'}}</p>
+@if(user()?.role==='recepcion'||user()?.role==='administrador'){
+@if(av.currentAssessment;as current){
+<h3>Aceptación del presupuesto</h3>
+<p>Revisión {{current.revision}} · {{current.amount}} {{current.currency}}</p>
+@if(budgetNeedsRefresh()){<p role="alert">Consulta nuevamente el folio para confirmar el resultado y revisar el presupuesto vigente.</p>}
+@if(av.communication;as communication){
+<p>Comunicación registrada el {{date(communication.recordedAt)}}.</p>
+@if(!av.authorizationRecorded){
+<form (ngSubmit)="saveBudget('budget-acceptances')" aria-label="Registrar aceptación del presupuesto">
+<label>Canal de confirmación<input name="acceptanceChannel" [(ngModel)]="acceptanceData.canal" maxlength="80" required [disabled]="busy()||budgetNeedsRefresh()"></label>
+<label>Evidencia de confirmación<textarea name="acceptanceEvidence" [(ngModel)]="acceptanceData.evidencia" maxlength="2000" rows="3" required [disabled]="busy()||budgetNeedsRefresh()"></textarea></label>
+<label>Responsable del registro<input name="acceptanceResponsible" [(ngModel)]="acceptanceData.responsable" maxlength="120" required [disabled]="busy()||budgetNeedsRefresh()"></label>
+<button [disabled]="busy()||budgetNeedsRefresh()||!acceptanceIsComplete()">Registrar aceptación</button>
+</form>}
+}@else{
+<p>Confirma la comunicación después de informar al cliente de esta revisión.</p>
+<button type="button" class="secondary" (click)="saveBudget('budget-communications')" [disabled]="busy()||budgetNeedsRefresh()">Registrar comunicación al cliente</button>
+}}
+@if(av.acceptances?.length){
+<h3>Historial de aceptaciones</h3>
+@for(a of av.acceptances;track a.id){
+<article class="assessment-history">
+<h4>Revisión {{a.revision}} · Aceptada</h4>
+<p><time [attr.datetime]="a.recordedAt">{{date(a.recordedAt)}}</time> · Registrada por {{a.authorName}}</p>
+<p><strong>Canal:</strong> {{a.canal}}</p>
+<p class="multiline"><strong>Evidencia:</strong> {{a.evidencia}}</p>
+<p><strong>Responsable:</strong> {{a.responsable}}</p>
+</article>
+}}
+}
 @if(user()?.role==='tecnico' && av.state==='En diagnóstico'){
 @if(assessmentNeedsRefresh()){<p role="alert">Consulta nuevamente el folio y comprueba las revisiones antes de confirmar otro guardado.</p>}
 @if(av.latestAssessment){<button class="secondary" type="button" (click)="useLatestAssessment()" [disabled]="busy()||assessmentNeedsRefresh()">Usar última revisión como base</button>}
@@ -51,6 +83,7 @@ export class App{
  user=signal<{name:string;username:string;role:string}|null>(null);busy=signal(false);message=signal('');receipt=signal<Receipt|null>(null);errors=signal<Record<string,string>>({});locked=signal(false);
  technicalOrder=signal<Receipt|null>(null);technicians=signal<{id:string;name:string}[]>([]);assignmentNeedsRefresh=signal(false);selectedTechnician='';assignmentNote='';assignmentConfirmed=false;
  assessmentView=signal<AssessmentView|null>(null);assessmentNeedsRefresh=signal(false);assessmentData=emptyAssessment();assessmentConfirmed=false;assessmentDraftFolio='';
+ budgetNeedsRefresh=signal(false);acceptanceData=emptyAcceptance();acceptanceDraftAssessment='';
  stateView=signal<StateView|null>(null);stateNeedsRefresh=signal(false);targetState='';stateNote='';stateConfirmed=false;stateDraftFolio='';
  username='';password='';csrf='';data=empty();accessoriesText='';lookupFolio='';key=crypto.randomUUID();snapshot:unknown=null;
  constructor(){void this.restore();window.addEventListener('beforeunload',e=>{if(this.locked()||this.stateNeedsRefresh()){e.preventDefault();e.returnValue='';}});}
@@ -60,15 +93,42 @@ export class App{
  async loadTechnicians(){if(this.user()?.role!=='tecnico'){const r=await this.api('/technicians');this.technicians.set(r.technicians);}}
  async logout(){if(this.locked()){this.message.set('Recupera el resultado pendiente antes de cerrar la sesión.');return;}this.busy.set(true);try{await this.api('/session','DELETE');this.user.set(null);this.csrf='';this.newOrder();this.password='';}catch(e){this.fail(e);}finally{this.busy.set(false);}}
  async save(){if(this.busy())return;this.busy.set(true);this.errors.set({});this.message.set('Guardado pendiente…');if(!this.snapshot)this.snapshot={...this.data,accessories:this.accessoriesText.split('\n').map(x=>x.trim()).filter(Boolean)};this.locked.set(true);try{const r=await this.api('/orders','POST',this.snapshot,this.key);this.receipt.set(r.order);this.message.set(r.replayed?'Recepción recuperada. Se conserva el mismo folio.':'Recepción guardada y confirmada.');this.locked.set(false);await this.loadStateActions(r.order.folio,r.order.version);}catch(e:any){if(e.status===422||e.status===400){this.snapshot=null;this.locked.set(false);}this.fail(e);}finally{this.busy.set(false);}}
- async lookup(){if(this.locked())return;this.busy.set(true);this.technicalOrder.set(null);this.assessmentView.set(null);this.stateView.set(null);try{const folio=encodeURIComponent(this.lookupFolio),r=await this.api('/orders/'+folio),av=await this.api('/orders/'+folio+'/assessments'),sv=await this.api('/orders/'+folio+'/state');if(r.order.version!==av.orderVersion||av.orderVersion!==sv.orderVersion)throw {status:409,message:'La orden cambió durante la consulta. Vuelve a consultar el folio.'};if(this.assessmentDraftFolio!==r.order.folio)this.assessmentData=emptyAssessment();if(this.stateDraftFolio!==r.order.folio)this.stateNote='';this.stateDraftFolio=r.order.folio;this.targetState='';this.stateConfirmed=false;this.stateView.set(sv);this.stateNeedsRefresh.set(false);this.assessmentDraftFolio=r.order.folio;this.assessmentView.set(av);this.assessmentNeedsRefresh.set(false);this.assessmentConfirmed=false;if(this.user()?.role==='tecnico'){this.technicalOrder.set(r.order);this.message.set('Orden asignada recuperada.');}else{this.receipt.set(r.order);this.assignmentNeedsRefresh.set(false);this.assignmentConfirmed=false;await this.loadTechnicians();this.message.set('Comprobante recuperado.');}}catch(e){this.fail(e);}finally{this.busy.set(false);}}
+ async lookup(){if(this.locked())return;this.busy.set(true);this.technicalOrder.set(null);this.assessmentView.set(null);this.stateView.set(null);try{const folio=encodeURIComponent(this.lookupFolio),r=await this.api('/orders/'+folio),av=await this.api('/orders/'+folio+'/assessments'),sv=await this.api('/orders/'+folio+'/state');if(r.order.version!==av.orderVersion||av.orderVersion!==sv.orderVersion)throw {status:409,message:'La orden cambió durante la consulta. Vuelve a consultar el folio.'};if(this.assessmentDraftFolio!==r.order.folio)this.assessmentData=emptyAssessment();if(this.stateDraftFolio!==r.order.folio)this.stateNote='';this.stateDraftFolio=r.order.folio;this.targetState='';this.stateConfirmed=false;this.stateView.set(sv);this.stateNeedsRefresh.set(false);this.assessmentDraftFolio=r.order.folio;this.assessmentView.set(av);this.resetBudgetDraft(av);this.assessmentNeedsRefresh.set(false);this.assessmentConfirmed=false;if(this.user()?.role==='tecnico'){this.technicalOrder.set(r.order);this.message.set('Orden asignada recuperada.');}else{this.receipt.set(r.order);this.assignmentNeedsRefresh.set(false);this.assignmentConfirmed=false;await this.loadTechnicians();this.message.set('Comprobante recuperado.');}}catch(e){this.fail(e);}finally{this.busy.set(false);}}
  async loadStateActions(folio:string,version:number){try{const sv=await this.api('/orders/'+folio+'/state');this.stateView.set(sv);this.stateNeedsRefresh.set(sv.orderVersion!==version);this.stateDraftFolio=folio;this.targetState='';this.stateConfirmed=false;}catch{this.stateView.set(null);this.stateNeedsRefresh.set(true);}}
+ resetBudgetDraft(view:AssessmentView|null){
+  const id=view?.currentAssessment?.id??'';
+  if(id!==this.acceptanceDraftAssessment||view?.authorizationRecorded)this.acceptanceData=emptyAcceptance();
+  this.acceptanceDraftAssessment=id;
+  this.budgetNeedsRefresh.set(false);
+ }
+ acceptanceIsComplete(){return Object.values(this.acceptanceData).every(value=>value.trim());}
+ async saveBudget(action:'budget-communications'|'budget-acceptances'){
+  const order=this.receipt(),view=this.assessmentView(),current=view?.currentAssessment;
+  if(!order||!current||this.busy()||this.budgetNeedsRefresh()||this.user()?.role==='tecnico')return;
+  const accepting=action==='budget-acceptances';
+  if(accepting&&(!view.communication||view.authorizationRecorded||!this.acceptanceIsComplete()))return;
+  this.busy.set(true);
+  try{
+   const updated=await this.api('/orders/'+order.folio+'/'+action,'POST',{
+    presupuestoId:current.id,...(accepting?this.acceptanceData:{}),
+   });
+   this.assessmentView.set(updated);
+   this.resetBudgetDraft(updated);
+   if(accepting)await this.loadStateActions(order.folio,updated.orderVersion);
+   this.message.set(accepting?'Aceptación guardada en el historial.':'Comunicación del presupuesto registrada.');
+  }catch(e:any){
+   if(e.status===409||!e.status||e.status>=500)this.budgetNeedsRefresh.set(true);
+   if(!e.status||e.status>=500)this.message.set('Consulta nuevamente el folio para comprobar si el registro se guardó.');
+   else this.fail(e);
+  }finally{this.busy.set(false);}
+ }
  async changeState(){const sv=this.stateView();if(!sv||this.busy()||!this.stateConfirmed||this.stateNeedsRefresh())return;this.busy.set(true);this.lookupFolio=sv.folio;try{const r=await this.api('/orders/'+sv.folio+'/state','POST',{state:this.targetState,expectedVersion:sv.orderVersion,note:this.stateNote});this.stateView.set(r);this.stateConfirmed=false;this.targetState='';this.stateNote='';this.receipt.update(o=>o?{...o,state:r.state,version:r.orderVersion}:null);this.technicalOrder.update(o=>o?{...o,state:r.state,version:r.orderVersion}:null);this.assessmentView.update(a=>a?{...a,state:r.state,orderVersion:r.orderVersion}:null);this.message.set('Cambio de estado guardado y registrado en el historial.');}catch(e:any){this.stateConfirmed=false;this.stateNeedsRefresh.set(true);if(!e.status||e.status>=500)this.message.set('No se recibió confirmación del cambio. Conserva la nota y consulta este folio.');else this.fail(e);}finally{this.busy.set(false);}}
  useLatestAssessment(){const a=this.assessmentView()?.latestAssessment;if(!a)return;this.assessmentData={diagnosis:a.diagnosis,proposedWork:a.proposedWork,amount:a.amount,currency:a.currency,note:''};this.assessmentConfirmed=false;}
  async saveAssessment(){const view=this.assessmentView(),order=this.technicalOrder();if(!view||!order||this.busy()||!this.assessmentConfirmed||this.assessmentNeedsRefresh())return;this.busy.set(true);this.errors.set({});try{const r=await this.api('/orders/'+order.folio+'/assessments','POST',{...this.assessmentData,expectedVersion:view.orderVersion});this.assessmentView.set(r);this.technicalOrder.set({...order,version:r.orderVersion});this.assessmentConfirmed=false;this.assessmentData.note='';await this.loadStateActions(order.folio,r.orderVersion);this.message.set('Nueva revisión guardada. Las revisiones anteriores están disponibles en el historial.');}catch(e:any){this.assessmentConfirmed=false;if(e.status!==422)this.assessmentNeedsRefresh.set(true);if(!e.status||e.status>=500)this.message.set('No se recibió confirmación de la revisión. Conserva la captura y consulta las revisiones de este folio.');else this.fail(e);}finally{this.busy.set(false);}}
  async assign(){const r=this.receipt();if(!r||this.busy()||!this.assignmentConfirmed||this.assignmentNeedsRefresh())return;this.busy.set(true);this.assessmentView.set(null);this.lookupFolio=r.folio;try{const response=await this.api('/orders/'+r.folio+'/assignments','POST',{technicianId:this.selectedTechnician,expectedVersion:r.version,note:this.assignmentNote});this.receipt.set(response.order);this.assignmentConfirmed=false;this.assignmentNote='';await this.loadStateActions(r.folio,response.order.version);this.message.set('Asignación guardada. Se conservan las asignaciones anteriores.');}catch(e:any){this.assignmentNeedsRefresh.set(true);this.assignmentConfirmed=false;if(!e.status||e.status>=500){this.message.set('No se recibió confirmación de la asignación. Consulta este folio para comprobar el resultado.');}else this.fail(e);}finally{this.busy.set(false);}}
- fail(e:any){if(e.status===401){this.user.set(null);this.csrf='';this.receipt.set(null);this.technicalOrder.set(null);this.assessmentView.set(null);this.stateView.set(null);this.technicians.set([]);}this.errors.set(e.fields||{});this.message.set(e.message||'No se recibió confirmación. Conserva la captura y reintenta.');}
+ fail(e:any){if(e.status===401){this.user.set(null);this.csrf='';this.receipt.set(null);this.technicalOrder.set(null);this.assessmentView.set(null);this.resetBudgetDraft(null);this.stateView.set(null);this.technicians.set([]);}this.errors.set(e.fields||{});this.message.set(e.message||'No se recibió confirmación. Conserva la captura y reintenta.');}
  extraErrors(){return Object.entries(this.errors()).map(([key,value])=>key+': '+value);}
- newOrder(){this.receipt.set(null);this.technicalOrder.set(null);this.stateView.set(null);this.stateNeedsRefresh.set(false);this.stateNote='';this.stateDraftFolio='';this.targetState='';this.stateConfirmed=false;this.assessmentView.set(null);this.assessmentNeedsRefresh.set(false);this.assessmentData=emptyAssessment();this.assessmentDraftFolio='';this.assessmentConfirmed=false;this.assignmentNeedsRefresh.set(false);this.assignmentConfirmed=false;this.assignmentNote='';this.selectedTechnician='';this.data=empty();this.accessoriesText='';this.key=crypto.randomUUID();this.snapshot=null;this.locked.set(false);this.message.set('');this.errors.set({});}
+ newOrder(){this.receipt.set(null);this.technicalOrder.set(null);this.stateView.set(null);this.stateNeedsRefresh.set(false);this.stateNote='';this.stateDraftFolio='';this.targetState='';this.stateConfirmed=false;this.assessmentView.set(null);this.resetBudgetDraft(null);this.assessmentNeedsRefresh.set(false);this.assessmentData=emptyAssessment();this.assessmentDraftFolio='';this.assessmentConfirmed=false;this.assignmentNeedsRefresh.set(false);this.assignmentConfirmed=false;this.assignmentNote='';this.selectedTechnician='';this.data=empty();this.accessoriesText='';this.key=crypto.randomUUID();this.snapshot=null;this.locked.set(false);this.message.set('');this.errors.set({});}
  date(value:string){return new Date(value).toLocaleString('es-MX');}printReceipt(){window.print();}
 }
 bootstrapApplication(App).catch(error=>console.error(error));

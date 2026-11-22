@@ -1,18 +1,20 @@
 import {HttpError} from '../validation.js';
-import {assessmentAccess} from './assessment-model.js';
+import {assessmentAccess,readBudgetStatus} from './assessment-model.js';
 export async function readState(db,folio,user){
  const order=await assessmentAccess(db,folio,user);
  const history=(await db.query(`SELECT h.previous_value AS "previousState",h.new_value AS state,h.note,h.changed_at AS "changedAt",u.display_name AS author FROM reparix.order_history h JOIN reparix.internal_users u ON u.id=h.actor_id WHERE h.order_id=$1 AND h.field='estado' ORDER BY h.changed_at,h.id`,[order.id])).rows;
  const meta=(await db.query(`SELECT COALESCE(o.state_changed_at,o.received_at) AS "changedAt",u.display_name AS "changedBy" FROM reparix.orders o JOIN reparix.internal_users u ON u.id=COALESCE(o.state_changed_by,o.created_by) WHERE o.id=$1`,[order.id])).rows[0];
  const ready=order.assignment&&(await db.query("SELECT 1 FROM reparix.internal_users WHERE id=$1 AND active AND role='tecnico'",[order.assignment.technician_id])).rowCount>0;
- const latest=(await db.query('SELECT assignment_id FROM reparix.order_assessments WHERE order_id=$1 ORDER BY revision DESC LIMIT 1',[order.id])).rows[0];
+ const latest=(await db.query('SELECT id,assignment_id FROM reparix.order_assessments WHERE order_id=$1 ORDER BY revision DESC LIMIT 1',[order.id])).rows[0];
+ const current=latest?.assignment_id===order.assignment?.id?latest:null;
+ const budget=await readBudgetStatus(db,order.id,current?.id);
  const allowedTransitions=[];let blockedReason='';
- if(order.state==='Pendiente de autorización')blockedReason='Se requiere la autorización del presupuesto para iniciar la reparación.';
+ if(order.state==='Pendiente de autorización')blockedReason=budget.accepted?'La aceptación del presupuesto está registrada.':'Se requiere la autorización del presupuesto para iniciar la reparación.';
  else if(!ready)blockedReason='Se requiere una asignación vigente a un técnico activo.';
  else if(order.state==='Recibido')allowedTransitions.push('En diagnóstico');
- else if(latest?.assignment_id===order.assignment?.id)allowedTransitions.push('Pendiente de autorización');
+ else if(current)allowedTransitions.push('Pendiente de autorización');
  else blockedReason='Registra diagnóstico y presupuesto para la asignación vigente.';
- return {folio,state:order.state,orderVersion:order.version,...meta,history,allowedTransitions,blockedReason,authorizationRecorded:false};
+ return {folio,state:order.state,orderVersion:order.version,...meta,history,allowedTransitions,blockedReason,authorizationRecorded:budget.accepted};
 }
 export async function transitionState(pool,folio,data,user,requestId){
  const db=await pool.connect();

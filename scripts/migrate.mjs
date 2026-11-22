@@ -26,6 +26,7 @@ try{
  await db.query('GRANT UPDATE(version_lock) ON reparix.orders TO reparix_app');
  await db.query('GRANT EXECUTE ON FUNCTION reparix.lock_active_technician(uuid) TO reparix_app');
  await db.query('GRANT SELECT,INSERT ON reparix.order_assessments TO reparix_app');
+ await db.query('GRANT SELECT,INSERT ON reparix.budget_communications,reparix.budget_acceptances TO reparix_app');
  await db.query('GRANT EXECUTE ON FUNCTION reparix.transition_order(text,uuid,integer,text,text,uuid) TO reparix_app');
  await db.query('COMMIT');console.log('Incremental migrations applied or already present; runtime role restricted by column.');
 }catch(error){await db.query('ROLLBACK');throw error;}finally{await db.end();}
