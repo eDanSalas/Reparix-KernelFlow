@@ -5,7 +5,9 @@ type Assignment={id:string;technicianId:string;technicianName:string;assignedAt:
 type Receipt={folio:string;state:string;version:number;receivedAt:string;clientName:string;phone:string;email:string|null;deviceType:string;brand:string;model:string;serialNumber:string|null;serialUnavailableReason:string|null;reportedFault:string;physicalCondition:string;accessories:string[];history:{author:string;changedAt:string}[];currentAssignment:Assignment|null;assignmentHistory:Assignment[]};
 type Assessment={id:string;revision:number;assignmentId:string;diagnosis:string;proposedWork:string;amount:string;currency:string;note:string;authorName:string;registeredAt:string};
 type BudgetAcceptance={id:string;assessmentId:string;revision:number;canal:string;evidencia:string;responsable:string;authorName:string;recordedAt:string};
-type AssessmentView={orderVersion:number;state:string;assessments:Assessment[];currentAssessment:Assessment|null;latestAssessment:Assessment|null;authorizationRecorded:boolean;communication:{recordedAt:string}|null;acceptances?:BudgetAcceptance[]};
+type BudgetRejection={recordedAt:string;authorName:string;evidence:string};
+type BudgetAction='budget-communications'|'budget-acceptances'|'budget-rejections';
+type AssessmentView={orderVersion:number;state:string;assessments:Assessment[];currentAssessment:Assessment|null;latestAssessment:Assessment|null;authorizationRecorded:boolean;budgetRejected:boolean;communication:{recordedAt:string}|null;acceptances?:BudgetAcceptance[];rejection?:BudgetRejection|null};
 type StateView={folio:string;state:string;orderVersion:number;changedAt:string;changedBy:string;allowedTransitions:string[];blockedReason:string;history:{previousState:string|null;state:string;note:string;changedAt:string;author:string}[]};
 const emptyAssessment=()=>({diagnosis:'',proposedWork:'',amount:'',currency:'MXN',note:''});
 const emptyAcceptance=()=>({canal:'',evidencia:'',responsable:''});
@@ -38,25 +40,37 @@ const empty=()=>({clientName:'',phone:'',email:'',deviceType:'',brand:'',model:'
 @for(item of extraErrors();track item){<p class="error">{{item}}</p>}
 <div class="actions"><p class="muted">{{locked()?'Resultado pendiente. Conserva esta captura y reintenta para recuperar la misma orden.':'El folio aparecerá cuando el guardado esté confirmado.'}}</p><button [disabled]="busy()||f.invalid">{{busy()?'Guardando…':locked()?'Reintentar la misma recepción':'Confirmar recepción'}}</button></div>
 </form>}}
-@if(stateView();as sv){<section class="panel state-panel" aria-label="Estado de la orden"><h2>Estado de la orden</h2><p><strong>{{sv.state}}</strong> · Versión {{sv.orderVersion}}</p><p>Última actualización: {{date(sv.changedAt)}} · {{sv.changedBy}}</p><p class="muted">{{sv.blockedReason || 'Confirma el siguiente estado solo después de comprobar sus condiciones.'}}</p>
+@if(stateView();as sv){<section class="panel state-panel" aria-label="Estado de la orden"><h2>Estado de la orden</h2><p><strong>{{sv.state}}</strong> · Versión {{sv.orderVersion}}</p><p>Última actualización: {{date(sv.changedAt)}} · {{sv.changedBy}}</p>
+@if(sv.blockedReason){<p class="muted">{{sv.blockedReason}}</p>}
+@if(sv.allowedTransitions.includes('En reparación')){<p>El cliente autorizó el presupuesto vigente. Puedes iniciar la reparación.</p>}
 @if(stateNeedsRefresh()){<p role="alert">Consulta nuevamente el folio antes de confirmar otro cambio de estado.</p>}
 @if(sv.allowedTransitions.length){<form (ngSubmit)="changeState()" #st="ngForm"><label>Nuevo estado<select name="targetState" [(ngModel)]="targetState" (ngModelChange)="stateConfirmed=false" required [disabled]="busy()||stateNeedsRefresh()"><option value="">Selecciona el siguiente estado</option>@for(s of sv.allowedTransitions;track s){<option [value]="s">{{s}}</option>}</select></label><label>Nota del cambio<input name="stateNote" [(ngModel)]="stateNote" (ngModelChange)="stateConfirmed=false" required minlength="3" maxlength="500" [disabled]="busy()||stateNeedsRefresh()"></label><label class="check"><input name="stateConfirmed" type="checkbox" [(ngModel)]="stateConfirmed" required [disabled]="busy()||stateNeedsRefresh()"> Confirmo el estado seleccionado y la nota.</label><button [disabled]="busy()||st.invalid||stateNeedsRefresh()">Confirmar cambio de estado</button></form>}
 <h3>Historial de estados</h3>@for(h of sv.history;track $index){<p class="state-history">{{h.previousState || 'Alta'}} → {{h.state}} · {{date(h.changedAt)}} · {{h.author}}<br>{{h.note}}</p>}</section>}
-@if(assessmentView();as av){<section class="panel assessment" aria-label="Diagnóstico y presupuesto"><h2>Diagnóstico y presupuesto</h2><p>Versión de orden {{av.orderVersion}} · {{av.currentAssessment ? 'Revisión vigente: '+av.currentAssessment.revision : 'Sin revisión de la asignación vigente'}}</p><p class="muted">{{av.authorizationRecorded ? 'Presupuesto autorizado.' : 'Presupuesto sin autorización registrada.'}}</p>
+@if(assessmentView();as av){<section class="panel assessment" aria-label="Diagnóstico y presupuesto"><h2>Diagnóstico y presupuesto</h2><p>Versión de orden {{av.orderVersion}} · {{av.currentAssessment ? 'Revisión vigente: '+av.currentAssessment.revision : 'Sin revisión de la asignación vigente'}}</p><p>{{av.authorizationRecorded ? 'Presupuesto vigente autorizado.' : av.budgetRejected ? 'Presupuesto vigente rechazado.' : 'Presupuesto vigente sin autorización.'}}</p>
 @if(user()?.role==='recepcion'||user()?.role==='administrador'){
 @if(av.currentAssessment;as current){
-<h3>Aceptación del presupuesto</h3>
+<h3>Decisión sobre el presupuesto</h3>
 <p>Revisión {{current.revision}} · {{current.amount}} {{current.currency}}</p>
 @if(budgetNeedsRefresh()){<p role="alert">Consulta nuevamente el folio para confirmar el resultado y revisar el presupuesto vigente.</p>}
 @if(av.communication;as communication){
 <p>Comunicación registrada el {{date(communication.recordedAt)}}.</p>
-@if(!av.authorizationRecorded){
+@if(!av.authorizationRecorded && av.state!=='En reparación'){
 <form (ngSubmit)="saveBudget('budget-acceptances')" aria-label="Registrar aceptación del presupuesto">
 <label>Canal de confirmación<input name="acceptanceChannel" [(ngModel)]="acceptanceData.canal" maxlength="80" required [disabled]="busy()||budgetNeedsRefresh()"></label>
 <label>Evidencia de confirmación<textarea name="acceptanceEvidence" [(ngModel)]="acceptanceData.evidencia" maxlength="2000" rows="3" required [disabled]="busy()||budgetNeedsRefresh()"></textarea></label>
 <label>Responsable del registro<input name="acceptanceResponsible" [(ngModel)]="acceptanceData.responsable" maxlength="120" required [disabled]="busy()||budgetNeedsRefresh()"></label>
 <button [disabled]="busy()||budgetNeedsRefresh()||!acceptanceIsComplete()">Registrar aceptación</button>
+</form>
+@if(!av.rejection){<form (ngSubmit)="saveBudget('budget-rejections')" aria-label="Registrar rechazo del presupuesto">
+<label>Evidencia del rechazo<textarea name="rejectionEvidence" [(ngModel)]="rejectionEvidence" minlength="3" maxlength="500" rows="2" required [disabled]="busy()||budgetNeedsRefresh()"></textarea></label>
+<button class="secondary" [disabled]="busy()||budgetNeedsRefresh()||rejectionEvidence.trim().length<3">Registrar rechazo</button>
 </form>}
+}
+@if(av.rejection;as rejection){<article class="assessment-history">
+<h4>Rechazo registrado para la revisión {{current.revision}}</h4>
+<p><time [attr.datetime]="rejection.recordedAt">{{date(rejection.recordedAt)}}</time> · Registrado por {{rejection.authorName}}</p>
+<p class="multiline">{{rejection.evidence}}</p>
+</article>}
 }@else{
 <p>Confirma la comunicación después de informar al cliente de esta revisión.</p>
 <button type="button" class="secondary" (click)="saveBudget('budget-communications')" [disabled]="busy()||budgetNeedsRefresh()">Registrar comunicación al cliente</button>
@@ -83,7 +97,7 @@ export class App{
  user=signal<{name:string;username:string;role:string}|null>(null);busy=signal(false);message=signal('');receipt=signal<Receipt|null>(null);errors=signal<Record<string,string>>({});locked=signal(false);
  technicalOrder=signal<Receipt|null>(null);technicians=signal<{id:string;name:string}[]>([]);assignmentNeedsRefresh=signal(false);selectedTechnician='';assignmentNote='';assignmentConfirmed=false;
  assessmentView=signal<AssessmentView|null>(null);assessmentNeedsRefresh=signal(false);assessmentData=emptyAssessment();assessmentConfirmed=false;assessmentDraftFolio='';
- budgetNeedsRefresh=signal(false);acceptanceData=emptyAcceptance();acceptanceDraftAssessment='';
+ budgetNeedsRefresh=signal(false);acceptanceData=emptyAcceptance();rejectionEvidence='';budgetDraftAssessment='';
  stateView=signal<StateView|null>(null);stateNeedsRefresh=signal(false);targetState='';stateNote='';stateConfirmed=false;stateDraftFolio='';
  username='';password='';csrf='';data=empty();accessoriesText='';lookupFolio='';key=crypto.randomUUID();snapshot:unknown=null;
  constructor(){void this.restore();window.addEventListener('beforeunload',e=>{if(this.locked()||this.stateNeedsRefresh()){e.preventDefault();e.returnValue='';}});}
@@ -97,25 +111,29 @@ export class App{
  async loadStateActions(folio:string,version:number){try{const sv=await this.api('/orders/'+folio+'/state');this.stateView.set(sv);this.stateNeedsRefresh.set(sv.orderVersion!==version);this.stateDraftFolio=folio;this.targetState='';this.stateConfirmed=false;}catch{this.stateView.set(null);this.stateNeedsRefresh.set(true);}}
  resetBudgetDraft(view:AssessmentView|null){
   const id=view?.currentAssessment?.id??'';
-  if(id!==this.acceptanceDraftAssessment||view?.authorizationRecorded)this.acceptanceData=emptyAcceptance();
-  this.acceptanceDraftAssessment=id;
+  if(id!==this.budgetDraftAssessment||view?.authorizationRecorded)this.acceptanceData=emptyAcceptance();
+  if(id!==this.budgetDraftAssessment||view?.rejection||view?.authorizationRecorded)this.rejectionEvidence='';
+  this.budgetDraftAssessment=id;
   this.budgetNeedsRefresh.set(false);
  }
  acceptanceIsComplete(){return Object.values(this.acceptanceData).every(value=>value.trim());}
- async saveBudget(action:'budget-communications'|'budget-acceptances'){
+ async saveBudget(action:BudgetAction){
   const order=this.receipt(),view=this.assessmentView(),current=view?.currentAssessment;
   if(!order||!current||this.busy()||this.budgetNeedsRefresh()||this.user()?.role==='tecnico')return;
   const accepting=action==='budget-acceptances';
-  if(accepting&&(!view.communication||view.authorizationRecorded||!this.acceptanceIsComplete()))return;
+  const rejecting=action==='budget-rejections';
+  if((accepting||rejecting)&&(!view.communication||view.authorizationRecorded||view.state==='En reparación'))return;
+  if(accepting&&!this.acceptanceIsComplete())return;
+  if(rejecting&&(view.rejection||this.rejectionEvidence.trim().length<3))return;
   this.busy.set(true);
   try{
    const updated=await this.api('/orders/'+order.folio+'/'+action,'POST',{
-    presupuestoId:current.id,...(accepting?this.acceptanceData:{}),
+    presupuestoId:current.id,...(accepting?this.acceptanceData:{}),...(rejecting?{evidencia:this.rejectionEvidence}:{}),
    });
    this.assessmentView.set(updated);
    this.resetBudgetDraft(updated);
-   if(accepting)await this.loadStateActions(order.folio,updated.orderVersion);
-   this.message.set(accepting?'Aceptación guardada en el historial.':'Comunicación del presupuesto registrada.');
+   if(accepting||rejecting)await this.loadStateActions(order.folio,updated.orderVersion);
+   this.message.set(accepting?'Aceptación guardada en el historial.':rejecting?'Rechazo guardado en el historial.':'Comunicación del presupuesto registrada.');
   }catch(e:any){
    if(e.status===409||!e.status||e.status>=500)this.budgetNeedsRefresh.set(true);
    if(!e.status||e.status>=500)this.message.set('Consulta nuevamente el folio para comprobar si el registro se guardó.');

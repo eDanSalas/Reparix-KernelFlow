@@ -48,6 +48,7 @@ export function createApp(pool,{origin='http://localhost:3000',production=false,
  const budget=budgetController(pool);
  app.post('/api/orders/:folio/budget-communications',budget.communicate);
  app.post('/api/orders/:folio/budget-acceptances',budget.accept);
+ app.post('/api/orders/:folio/budget-rejections',budget.reject);
  const states=stateController(pool);app.get('/api/orders/:folio/state',states.get);app.post('/api/orders/:folio/state',states.create);
  app.use('/api',(req,res,next)=>next(new HttpError(404,'Operación no encontrada.')));
  const dist=fileURLToPath(new URL('../../client/dist/client/browser/',import.meta.url));
@@ -55,7 +56,7 @@ export function createApp(pool,{origin='http://localhost:3000',production=false,
  app.use((error,req,res,next)=>{
   let status=error.status||500;if(status<400||status>599)status=500;
   if(status>=500)logger.error(JSON.stringify({requestId:req.requestId,code:error.code||'INTERNAL_ERROR'}));
-  const budgetWrite=/\/budget-(communications|acceptances)$/.test(req.path);
+  const budgetWrite=/\/budget-(communications|acceptances|rejections)$/.test(req.path);
   res.status(status).json({message:status>=500?(budgetWrite?'Consulta nuevamente el folio para comprobar si el registro se guardó.':req.path.endsWith('/state')?'No fue posible confirmar el cambio. Conserva la nota y consulta el estado del folio.':req.path.endsWith('/assessments')?'No fue posible confirmar la revisión. Conserva la captura y consulta las revisiones del folio.':'No fue posible confirmar el guardado. Conserva la captura y reintenta con la misma clave.'):error.type==='entity.parse.failed'?'El cuerpo JSON no es válido.':error.message,fields:error.fields,conflict:error.conflict,requestId:req.requestId});
  });return app;
 }

@@ -38,6 +38,21 @@ export function recordCommunication(pool, folio, assessmentId, user) {
   });
 }
 
+export function recordRejection(pool, folio, { presupuestoId, evidencia }, user, requestId) {
+  return saveBudgetRecord(pool, folio, user, async (db, order, current, status) => {
+    if (current?.id !== presupuestoId || !status.communicatedAt) {
+      throw new HttpError(409, 'El presupuesto debe estar vigente y haber sido comunicado al cliente.');
+    }
+    if (order.state === 'En reparación' || status.accepted || status.rejection) {
+      throw new HttpError(409, 'No se puede rechazar una revisión con una decisión registrada o una reparación en curso.');
+    }
+    await db.query(`
+      INSERT INTO reparix.order_history(id,order_id,actor_id,changed_at,field,new_value,note,request_id)
+      VALUES($1,$2,$3,clock_timestamp(),'rechazo_presupuesto',$4,$5,$6)`,
+    [randomUUID(), order.id, user.id, presupuestoId, evidencia, requestId]);
+  });
+}
+
 export function recordAcceptance(pool, folio, data, user, requestId) {
   return saveBudgetRecord(pool, folio, user, async (db, order, current, status) => {
     const service = new RegistroAceptacionPresupuesto({
@@ -55,9 +70,9 @@ export function recordAcceptance(pool, folio, data, user, requestId) {
           await db.query(`
             INSERT INTO reparix.budget_acceptances
               (id,order_id,assessment_id,channel,evidence,responsible,actor_id,recorded_at)
-            VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [
+            VALUES($1,$2,$3,$4,$5,$6,$7,clock_timestamp())`, [
             id, decision.ordenId, decision.presupuestoId, decision.canal, decision.evidencia,
-            decision.responsable, decision.autor, decision.fechaHora,
+            decision.responsable, decision.autor,
           ]);
           return { id };
         },
@@ -67,8 +82,9 @@ export function recordAcceptance(pool, folio, data, user, requestId) {
           await db.query(`
             INSERT INTO reparix.order_history
               (id,order_id,actor_id,changed_at,field,previous_value,new_value,note,request_id)
-            VALUES($1,$2,$3,$4,'aceptacion_presupuesto',NULL,$5,$6,$7)`, [
-            randomUUID(), evento.ordenId, evento.autor, evento.fechaHora, evento.decisionId,
+            SELECT $1,b.order_id,b.actor_id,b.recorded_at,'aceptacion_presupuesto',NULL,b.id::text,$3,$4
+            FROM reparix.budget_acceptances b WHERE b.id=$2`, [
+            randomUUID(), evento.decisionId,
             `Aceptación de la revisión ${evento.revision}`, requestId,
           ]);
         },

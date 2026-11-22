@@ -9,12 +9,19 @@ export async function readState(db,folio,user){
  const current=latest?.assignment_id===order.assignment?.id?latest:null;
  const budget=await readBudgetStatus(db,order.id,current?.id);
  const allowedTransitions=[];let blockedReason='';
- if(order.state==='Pendiente de autorización')blockedReason=budget.accepted?'La aceptación del presupuesto está registrada.':'Se requiere la autorización del presupuesto para iniciar la reparación.';
- else if(!ready)blockedReason='Se requiere una asignación vigente a un técnico activo.';
- else if(order.state==='Recibido')allowedTransitions.push('En diagnóstico');
- else if(current)allowedTransitions.push('Pendiente de autorización');
- else blockedReason='Registra diagnóstico y presupuesto para la asignación vigente.';
- return {folio,state:order.state,orderVersion:order.version,...meta,history,allowedTransitions,blockedReason,authorizationRecorded:budget.accepted};
+ if(order.state!=='En reparación'){
+  if(!ready)blockedReason='Se requiere una asignación vigente a un técnico activo.';
+  else if(order.state==='Recibido')allowedTransitions.push('En diagnóstico');
+  else if(order.state==='En diagnóstico'){
+   if(current)allowedTransitions.push('Pendiente de autorización');
+   else blockedReason='Registra diagnóstico y presupuesto para la asignación vigente.';
+  }else if(!budget.authorized){
+   blockedReason=budget.rejection?'El cliente rechazó el presupuesto vigente.':'Se requiere la autorización del presupuesto vigente para iniciar la reparación.';
+  }
+  else if(user.role==='administrador')allowedTransitions.push('En reparación');
+  else blockedReason='El responsable del taller puede iniciar la reparación.';
+ }
+ return {folio,state:order.state,orderVersion:order.version,...meta,history,allowedTransitions,blockedReason,authorizationRecorded:budget.authorized};
 }
 export async function transitionState(pool,folio,data,user,requestId){
  const db=await pool.connect();

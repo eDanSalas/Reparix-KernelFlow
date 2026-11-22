@@ -72,7 +72,7 @@ test('Aceptación del presupuesto con Express y PostgreSQL', async t => {
   });
 
   await t.test('Registra una sola decisión válida y conserva el historial y estado al volver a iniciar sesión', async () => {
-    const start = Date.now();
+    const { rows: [{ now: start }] } = await owner.query('SELECT clock_timestamp() AS now');
     const responses = await Promise.all([
       call(acceptance, rec, { ...payload, authorId: users.tecnico.id, recordedAt: '2000-01-01T00:00:00Z' }),
       call(acceptance, rec, { ...payload, authorId: users.tecnico.id, recordedAt: '2000-01-01T00:00:00Z' }),
@@ -86,7 +86,8 @@ test('Aceptación del presupuesto con Express y PostgreSQL', async t => {
     assert.equal(saved.authorName, users.recepcion.name);
     assert.equal(saved.requestId, result.headers.get('x-request-id'));
     for (const [field, value] of Object.entries(demoAcceptance)) assert.equal(saved[field], value);
-    assert(Date.parse(saved.recordedAt) >= start && Date.parse(saved.recordedAt) <= Date.now());
+    const { rows: [{ now: end }] } = await owner.query('SELECT clock_timestamp() AS now');
+    assert(Date.parse(saved.recordedAt) >= start.getTime() && Date.parse(saved.recordedAt) <= end.getTime());
 
     const after = await stored();
     assert.equal(after.decisions.length, 1);
@@ -116,7 +117,6 @@ test('Aceptación del presupuesto con Express y PostgreSQL', async t => {
     assert.equal(state.body.authorizationRecorded, true);
     assert.equal(state.body.state, pending.state);
     assert.deepEqual(state.body.history, pending.history);
-    assert.deepEqual(state.body.allowedTransitions, []);
     const techView = await call(route + '/assessments', tech);
     assert.equal(techView.body.authorizationRecorded, true);
     assert.equal(techView.body.acceptances, undefined);

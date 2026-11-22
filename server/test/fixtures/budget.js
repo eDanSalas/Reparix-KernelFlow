@@ -12,7 +12,7 @@ export const demoAcceptance = {
   responsable: 'Recepción Demo',
 };
 
-export async function startBudgetFixture({ port = 0, logger = console } = {}) {
+export async function startBudgetFixture({ port = 0, logger = console, extraUsers = {} } = {}) {
   const database = 'reparix_test_' + randomUUID().replaceAll('-', '');
   const ownerUrl = new URL(process.env.OWNER_DATABASE_URL);
   const appUrl = new URL(process.env.DATABASE_URL);
@@ -46,6 +46,7 @@ export async function startBudgetFixture({ port = 0, logger = console } = {}) {
     const users = {
       recepcion: { id: randomUUID(), name: 'Ana Recepción Demo', role: 'recepcion' },
       tecnico: { id: randomUUID(), name: 'Luis Técnico Demo', role: 'tecnico' },
+      ...extraUsers,
     };
     for (const [username, user] of Object.entries(users)) {
       await owner.query(`
@@ -86,7 +87,7 @@ export async function startBudgetFixture({ port = 0, logger = console } = {}) {
     const rec = await login('recepcion');
     const tech = await login('tecnico');
 
-    async function prepareOrder(label = 'DEMO-01') {
+    async function prepareOrder(label = 'DEMO-01', { acceptFirst = false, moveToPending = true } = {}) {
       const { order } = await post('/orders', rec, {
         clientName: 'Cliente ficticio ' + label, phone: '5550100000', deviceType: 'Portátil',
         brand: 'Ejemplo', model: 'Modelo demo', serialNumber: label,
@@ -106,12 +107,17 @@ export async function startBudgetFixture({ port = 0, logger = console } = {}) {
       };
       const first = await post(route + '/assessments', tech, { ...assessment, expectedVersion: diagnostic.orderVersion });
       await post(route + '/budget-communications', rec, { presupuestoId: first.currentAssessment.id });
+      if (acceptFirst) {
+        await post(route + '/budget-acceptances', rec, {
+          presupuestoId: first.currentAssessment.id, ...demoAcceptance,
+        });
+      }
       const second = await post(route + '/assessments', tech, {
         ...assessment, amount: '1700.00', note: 'Revisión de importe', expectedVersion: first.orderVersion,
       });
-      const pending = await post(route + '/state', tech, {
+      const pending = moveToPending ? await post(route + '/state', tech, {
         state: 'Pendiente de autorización', expectedVersion: second.orderVersion, note: 'Diagnóstico listo',
-      });
+      }) : null;
       return { order, route, pending, first: first.currentAssessment, current: second.currentAssessment };
     }
 

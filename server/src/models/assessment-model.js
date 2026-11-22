@@ -17,9 +17,11 @@ export async function readAssessments(db,order,user){
  const budget=await readBudgetStatus(db,order.id,current?.id);
  const result={
   orderVersion:order.version,state:order.state,assessments:rows,latestAssessment:latest,currentAssessment:current,
-  authorizationRecorded:budget.accepted,communication:budget.communicatedAt?{recordedAt:budget.communicatedAt}:null,
+  authorizationRecorded:budget.authorized,budgetRejected:Boolean(budget.rejection)&&!budget.authorized,
+  communication:budget.communicatedAt?{recordedAt:budget.communicatedAt}:null,
  };
  if(user.role!=='tecnico'){
+  result.rejection=budget.rejection;
   const {rows:acceptances}=await db.query(`
    SELECT b.id,b.assessment_id AS "assessmentId",a.revision,b.channel AS canal,b.evidence AS evidencia,
      b.responsible AS responsable,h.actor_id AS "authorId",u.display_name AS "authorName",
@@ -34,13 +36,21 @@ export async function readAssessments(db,order,user){
  return result;
 }
 export async function readBudgetStatus(db,orderId,assessmentId){
- if(!assessmentId)return {communicatedAt:null,accepted:false};
+ const emptyStatus={communicatedAt:null,accepted:false,authorized:false,rejection:null};
+ if(!assessmentId)return emptyStatus;
  const {rows}=await db.query(`
-  SELECT c.communicated_at AS "communicatedAt",b.id IS NOT NULL AS accepted
+  SELECT c.communicated_at AS "communicatedAt",b.id IS NOT NULL AS accepted,
+    reparix.has_budget_authorization($1,$2) AS authorized, r.rejection
   FROM reparix.budget_communications c
   LEFT JOIN reparix.budget_acceptances b USING (order_id,assessment_id)
+  LEFT JOIN LATERAL (
+    SELECT jsonb_build_object('recordedAt',h.changed_at,'authorName',u.display_name,'evidence',h.note) AS rejection
+    FROM reparix.order_history h JOIN reparix.internal_users u ON u.id=h.actor_id
+    WHERE h.order_id=c.order_id AND h.field='rechazo_presupuesto' AND h.new_value=c.assessment_id::text
+    ORDER BY h.changed_at DESC,h.id DESC LIMIT 1
+  ) r ON true
   WHERE c.order_id=$1 AND c.assessment_id=$2`,[orderId,assessmentId]);
- return rows[0]??{communicatedAt:null,accepted:false};
+ return rows[0]??emptyStatus;
 }
 export async function saveAssessment(pool,folio,data,user,requestId){
  const db=await pool.connect();
