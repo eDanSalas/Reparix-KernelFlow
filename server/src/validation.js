@@ -2,7 +2,7 @@ export class HttpError extends Error{constructor(status,message,fields){super(me
 export const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function validateStateTransition(body){
  if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!['state','expectedVersion','note'].includes(k)))throw new HttpError(422,'Datos de transición no válidos.');
- if(!['En diagnóstico','Pendiente de autorización'].includes(body.state))throw new HttpError(422,'El estado destino no está habilitado. La reparación requiere CU-04 y aceptación vigente.');
+ if(!['En diagnóstico','Pendiente de autorización'].includes(body.state))throw new HttpError(422,'El estado solicitado no es válido para esta operación.');
  if(!Number.isSafeInteger(body.expectedVersion)||body.expectedVersion<1||body.expectedVersion>=2147483647)throw new HttpError(422,'Consulta una versión válida de la orden.');
  const note=typeof body.note==='string'?body.note.trim().normalize('NFC'):'';
  if(note.length<3||note.length>500||/[\u0000-\u001f\u007f]/.test(note))throw new HttpError(422,'La nota requiere de 3 a 500 caracteres sin controles.');
@@ -20,7 +20,7 @@ export function validateAssessment(body){
   if(v.length<min||v.length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(v))errors[key]=`Usa entre ${min} y ${max} caracteres válidos.`;
  }
  if(typeof body.amount!=='string'||!/^(0|[1-9]\d{0,9})\.\d{2}$/.test(body.amount)||body.amount==='0.00')errors.amount='Usa un importe positivo con punto y exactamente dos decimales, hasta 9999999999.99.';
- if(body.currency!=='MXN')errors.currency='La moneda habilitada en este incremento es MXN.';
+ if(body.currency!=='MXN')errors.currency='El presupuesto debe expresarse en pesos mexicanos (MXN).';
  result.amount=body.amount;result.currency=body.currency;
  if(Object.keys(errors).length)throw new HttpError(422,'Revisa diagnóstico y presupuesto.',errors);return result;
 }

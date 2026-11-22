@@ -95,9 +95,9 @@ function crearColaboradores(opciones = {}) {
   };
 }
 
-describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresupuesto', () => {
-  describe('Camino feliz (CA-1 y CA-3)', () => {
-    test('HU01-U01 registra aceptación vinculada a orden y presupuesto vigente, y escribe en Historial con fecha/hora y autor', async () => {
+describe('Registro de aceptación del presupuesto', () => {
+  describe('Registro válido', () => {
+    test('registra aceptación vinculada a orden y presupuesto vigente, y escribe en Historial con fecha/hora y autor', async () => {
       const colaboradores = crearColaboradores();
       const sut = new RegistroAceptacionPresupuesto(colaboradores);
       const solicitud = crearSolicitudValida({
@@ -159,7 +159,7 @@ describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresup
       assert.equal(resultado.decision.presupuestoRevision, 2);
     });
 
-    test('HU01-U02 NO inicia la reparación automáticamente en OrdenReparacion al registrar la aceptación (CA-3)', async () => {
+    test('no inicia la reparación automáticamente en OrdenReparacion al registrar la aceptación', async () => {
       const colaboradores = crearColaboradores();
       const sut = new RegistroAceptacionPresupuesto(colaboradores);
 
@@ -180,8 +180,8 @@ describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresup
     });
   });
 
-  describe('Rechazo por datos obligatorios faltantes o ausencia de presupuesto vigente (CA-1)', () => {
-    test('HU01-U03 rechaza cuando falta o viene vacío el canal sin guardar decisión ni alterar historial', async () => {
+  describe('Rechazo por datos obligatorios faltantes o ausencia de presupuesto vigente', () => {
+    test('rechaza cuando falta o viene vacío el canal sin guardar decisión ni alterar historial', async () => {
       for (const canal of [undefined, null, '', '   ']) {
         const colaboradores = crearColaboradores();
         const sut = new RegistroAceptacionPresupuesto(colaboradores);
@@ -198,7 +198,7 @@ describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresup
       }
     });
 
-    test('HU01-U04 rechaza cuando falta o viene vacía la evidencia sin guardar decisión ni alterar historial', async () => {
+    test('rechaza cuando falta o viene vacía la evidencia sin guardar decisión ni alterar historial', async () => {
       for (const evidencia of [undefined, null, '', '   ']) {
         const colaboradores = crearColaboradores();
         const sut = new RegistroAceptacionPresupuesto(colaboradores);
@@ -215,7 +215,7 @@ describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresup
       }
     });
 
-    test('HU01-U05 rechaza cuando falta o viene vacío el responsable sin guardar decisión ni alterar historial', async () => {
+    test('rechaza cuando falta o viene vacío el responsable sin guardar decisión ni alterar historial', async () => {
       for (const responsable of [undefined, null, '', '   ']) {
         const colaboradores = crearColaboradores();
         const sut = new RegistroAceptacionPresupuesto(colaboradores);
@@ -232,7 +232,7 @@ describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresup
       }
     });
 
-    test('HU01-U06 rechaza cuando no existe un presupuesto vigente para la orden sin guardar decisión ni alterar historial', async () => {
+    test('rechaza cuando no existe un presupuesto vigente para la orden sin guardar decisión ni alterar historial', async () => {
       for (const presupuestoVigente of [null, undefined]) {
         const colaboradores = crearColaboradores({ presupuestoVigente });
         const sut = new RegistroAceptacionPresupuesto(colaboradores);
@@ -248,7 +248,7 @@ describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresup
       }
     });
 
-    test('HU01-U07 rechaza cuando el presupuesto no está vigente o no fue comunicado al cliente', async () => {
+    test('rechaza cuando el presupuesto no está vigente o no fue comunicado al cliente', async () => {
       const casosNoValidos = [
         { ...crearPresupuestoVigente(), vigente: false },
         { ...crearPresupuestoVigente(), comunicado: false },
@@ -269,8 +269,8 @@ describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresup
     });
   });
 
-  describe('Denegación por falta de permisos (CA-2)', () => {
-    test('HU01-U08 deniega el registro cuando ControlAcceso rechaza al usuario sin guardar decisión ni escribir en Historial', async () => {
+  describe('Denegación por falta de permisos', () => {
+    test('deniega el registro cuando ControlAcceso rechaza al usuario sin guardar decisión ni escribir en Historial', async () => {
       const colaboradores = crearColaboradores({ tienePermiso: false });
       const sut = new RegistroAceptacionPresupuesto(colaboradores);
       const usuarioSinPermiso = crearUsuarioSinPermiso();
@@ -291,7 +291,7 @@ describe('HU-01 Registrar aceptación del presupuesto - RegistroAceptacionPresup
       assert.equal(colaboradores.ordenReparacion.actualizarEstado.mock.callCount(), 0);
     });
 
-    test('HU01-U09 deniega el registro cuando no hay usuario autenticado o es rechazado por ControlAcceso', async () => {
+    test('deniega el registro cuando no hay usuario autenticado o es rechazado por ControlAcceso', async () => {
       const colaboradores = crearColaboradores({ tienePermiso: false });
       const sut = new RegistroAceptacionPresupuesto(colaboradores);
 

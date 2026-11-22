@@ -6,7 +6,7 @@ import pg from 'pg';
 import {createApp} from '../src/app.js';
 import {hashPassword} from '../src/security.js';
 const payload=()=>({clientName:'Cliente sintético',phone:'5551234567',email:'test@example.test',deviceType:'Portátil',brand:'Prueba',model:'M-01',serialNumber:'DEMO',serialUnavailableReason:'',reportedFault:'No inicia el sistema.',physicalCondition:'Marcas visibles en carcasa.',accessories:['Cargador'],accessoriesConfirmed:true,physicalCheckConfirmed:true});
-test('CU-01 HTTP y PostgreSQL real en base aislada',async t=>{
+test('Recepción de equipos con HTTP y PostgreSQL',async t=>{
  const name='reparix_test_'+randomUUID().replaceAll('-','');
  assert.match(name,/^reparix_test_[a-f0-9]{32}$/);
  const admin=new pg.Client({connectionString:process.env.OWNER_DATABASE_URL});await admin.connect();

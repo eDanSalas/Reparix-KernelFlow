@@ -18,7 +18,7 @@ export function createApp(pool,{origin='http://localhost:3000',production=false,
  app.use('/api',rateLimit({windowMs:60000,limit:120,standardHeaders:'draft-8',legacyHeaders:false}));
  app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');if(!['GET','HEAD','OPTIONS'].includes(req.method)&&req.get('origin')!==origin)return next(new HttpError(403,'Origen de solicitud no permitido.'));next();});
  app.use(express.json({limit:'32kb',strict:true}));
- app.get('/api/health',async(req,res)=>{await pool.query('SELECT 1');res.json({status:'ok',increment:'CU-05 acotado'});});
+ app.get('/api/health',async(req,res)=>{await pool.query('SELECT 1');res.json({status:'ok'});});
  const loginLimit=rateLimit({windowMs:15*60000,limit:10,standardHeaders:'draft-8',legacyHeaders:false});
  app.post('/api/session',loginLimit,async(req,res)=>{
   const {username,password}=req.body||{};
@@ -45,7 +45,7 @@ export function createApp(pool,{origin='http://localhost:3000',production=false,
  app.get('/api/technicians',permit,assignments.list);app.post('/api/orders/:folio/assignments',permit,assignments.assign);
  const assessments=assessmentController(pool);app.get('/api/orders/:folio/assessments',assessments.get);app.post('/api/orders/:folio/assessments',assessments.create);
  const states=stateController(pool);app.get('/api/orders/:folio/state',states.get);app.post('/api/orders/:folio/state',states.create);
- app.use('/api',(req,res,next)=>next(new HttpError(404,'Operación no disponible en este incremento.')));
+ app.use('/api',(req,res,next)=>next(new HttpError(404,'Operación no encontrada.')));
  const dist=fileURLToPath(new URL('../../client/dist/client/browser/',import.meta.url));
  if(existsSync(dist)){app.use(express.static(dist));app.get('/{*path}',(req,res)=>res.sendFile(path.join(dist,'index.html')));}
  app.use((error,req,res,next)=>{
