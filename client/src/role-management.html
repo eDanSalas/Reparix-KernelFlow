@@ -1,0 +1,131 @@
+<section class="panel role-panel" aria-label="Gestión de roles" [attr.aria-busy]="busy()">
+  @if (notice()) { <p class="notice" role="status">{{notice()}}</p> }
+  @if (error()) { <p class="error" role="alert">{{error()}}</p> }
+
+  @if (registering()) {
+    <form class="account-registration" (ngSubmit)="registrationForm.valid && registerAccount()" #registrationForm="ngForm" aria-labelledby="register-account-title">
+      <h2 id="register-account-title">Registrar cuenta interna</h2>
+      <div class="account-fields">
+        <div class="account-field">
+          <label for="account-name">Nombre completo</label>
+          <input id="account-name" name="accountName" [(ngModel)]="registrationDraft.name" (ngModelChange)="clearRegistrationError('name')"
+            maxlength="120" required [disabled]="busy()"
+            [attr.aria-invalid]="registrationErrors()['name'] ? 'true' : null" [attr.aria-describedby]="registrationErrors()['name'] ? 'account-name-error' : null">
+          @if (registrationErrors()['name']; as message) { <small id="account-name-error" role="alert">{{message}}</small> }
+        </div>
+        <div class="account-field">
+          <label for="account-username">Nombre de usuario</label>
+          <input id="account-username" name="accountUsername" [(ngModel)]="registrationDraft.username" (ngModelChange)="clearRegistrationError('username')"
+            [pattern]="usernamePattern" maxlength="80"
+            autocapitalize="none" spellcheck="false" autocomplete="off" required [disabled]="busy()"
+            [attr.aria-invalid]="registrationErrors()['username'] ? 'true' : null"
+            [attr.aria-describedby]="registrationErrors()['username'] ? 'account-username-hint account-username-error' : 'account-username-hint'">
+          <small id="account-username-hint" class="muted">De 3 a 80 caracteres. Usa minúsculas, números, punto, guion o guion bajo.</small>
+          @if (registrationErrors()['username']; as message) { <small id="account-username-error" role="alert">{{message}}</small> }
+        </div>
+        <div class="account-field">
+          <label for="account-password">Contraseña inicial</label>
+          <input id="account-password" name="accountPassword" [(ngModel)]="registrationDraft.password" (ngModelChange)="clearRegistrationError('password')"
+            type="password" autocomplete="new-password"
+            minlength="14" maxlength="128" required [disabled]="busy()"
+            [attr.aria-invalid]="registrationErrors()['password'] ? 'true' : null"
+            [attr.aria-describedby]="registrationErrors()['password'] ? 'account-password-hint account-password-error' : 'account-password-hint'">
+          <small id="account-password-hint" class="muted">De 14 a 128 caracteres.</small>
+          @if (registrationErrors()['password']; as message) { <small id="account-password-error" role="alert">{{message}}</small> }
+        </div>
+        <div class="account-field">
+          <label for="account-role">Rol inicial</label>
+          <select id="account-role" name="accountRole" [(ngModel)]="registrationDraft.role" (ngModelChange)="clearRegistrationError('role')"
+            required [disabled]="busy()"
+            [attr.aria-invalid]="registrationErrors()['role'] ? 'true' : null" [attr.aria-describedby]="registrationErrors()['role'] ? 'account-role-error' : null">
+            <option value="">Selecciona un rol</option>
+            @for (role of roles; track role) { <option [value]="role">{{profiles[role].name}}</option> }
+          </select>
+          @if (registrationErrors()['role']; as message) { <small id="account-role-error" role="alert">{{message}}</small> }
+        </div>
+      </div>
+      <div class="account-actions">
+        <button type="submit" [disabled]="busy() || registrationForm.invalid || !registrationDraft.name.trim() || !registrationDraft.password.trim()">Crear cuenta</button>
+        <button type="button" class="secondary" (click)="editRegistration(false)" [disabled]="busy()">Cancelar</button>
+      </div>
+    </form>
+  } @else {
+    @if (accounts(); as directory) {
+      <div class="account-actions">
+        <button type="button" class="secondary" (click)="editRegistration(true)" [disabled]="busy()">Registrar cuenta interna</button>
+      </div>
+      <label>Cuenta interna
+        <select name="account" [ngModel]="selectedId" (ngModelChange)="selectAccount($event)" [disabled]="busy()">
+          <option value="">Selecciona una cuenta</option>
+          @for (account of directory; track account.id) {
+            <option [value]="account.id">{{account.name}} ({{account.username}})</option>
+          }
+        </select>
+      </label>
+    } @else if (error()) {
+      <button type="button" class="secondary" (click)="loadAccounts()" [disabled]="busy()">Volver a cargar cuentas</button>
+    }
+
+    @if (details(); as view) {
+      <p class="role-current"><strong>Rol actual:</strong> {{profiles[view.account.role].name}} · {{view.account.active ? 'Cuenta activa' : 'Cuenta inactiva'}}</p>
+      <p>{{profiles[view.account.role].permissions}}</p>
+      @if (view.registration; as registration) {
+        <p class="state-history" aria-label="Alta de la cuenta"><strong>Alta de la cuenta</strong><br>
+          {{profiles[registration.initialRole].name}} · {{registration.actorName}} · <time [attr.datetime]="registration.registeredAt">{{date(registration.registeredAt)}}</time>
+        </p>
+      }
+      <form (ngSubmit)="save()" aria-label="Cambiar rol">
+        <label>Nuevo rol
+          <select name="role" [(ngModel)]="nextRole" [disabled]="busy() || confirmingDeactivation()" required>
+            <option value="">Selecciona un rol</option>
+            @for (role of roles; track role) {
+              <option [value]="role" [disabled]="role === view.account.role">{{profiles[role].name}}</option>
+            }
+          </select>
+        </label>
+        @if (nextRole) { <p>{{profiles[nextRole].permissions}}</p> }
+        @if (nextRole && view.account.username === currentUsername()) {
+          <p>Este cambio se aplicará a tu sesión actual.</p>
+        }
+        <button [disabled]="busy() || confirmingDeactivation() || !nextRole || nextRole === view.account.role">Guardar cambio de rol</button>
+      </form>
+
+      <section class="role-history" aria-label="Historial de roles">
+        <h2>Historial de roles</h2>
+        @for (entry of view.history; track entry.id) {
+          <article class="state-history">
+            <strong>{{profiles[entry.previousRole].name}} → {{profiles[entry.newRole].name}}</strong>
+            <p><time [attr.datetime]="entry.changedAt">{{date(entry.changedAt)}}</time> · {{entry.actorName}}</p>
+          </article>
+        } @empty { <p>La cuenta todavía no tiene cambios de rol registrados.</p> }
+      </section>
+
+      <section class="account-access" aria-label="Acceso de la cuenta">
+        <h2>Acceso de la cuenta</h2>
+        @if (view.account.active) {
+          @if (confirmingDeactivation()) {
+            <p><strong>¿Desactivar a {{view.account.name}} ({{view.account.username}})?</strong></p>
+            <p>Se cerrarán sus sesiones y se conservará su autoría en el historial.</p>
+            @if (view.account.username === currentUsername()) { <p>Tu sesión se cerrará al confirmar.</p> }
+            <div class="account-actions">
+              <button type="button" class="destructive" (click)="deactivateAccount()" [disabled]="busy()">Confirmar desactivación</button>
+              <button type="button" class="secondary" (click)="confirmingDeactivation.set(false)" [disabled]="busy()">Cancelar</button>
+            </div>
+          } @else {
+            <button type="button" class="secondary" (click)="confirmingDeactivation.set(true)" [disabled]="busy()">Desactivar cuenta</button>
+          }
+        } @else {
+          @for (event of view.deactivations; track event.id) {
+            <article class="state-history">
+              <strong>Cuenta desactivada</strong>
+              <p><time [attr.datetime]="event.changedAt">{{date(event.changedAt)}}</time> · {{event.actorName}}</p>
+            </article>
+          } @empty { <p>La cuenta está inactiva y no tiene un evento de desactivación registrado.</p> }
+        }
+      </section>
+    } @else if (selectedId && error()) {
+      <button type="button" class="secondary" (click)="selectAccount(selectedId)" [disabled]="busy()">Volver a consultar la cuenta</button>
+    }
+  }
+  @if (busy()) { <p class="muted" role="status">Procesando…</p> }
+</section>

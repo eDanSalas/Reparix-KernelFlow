@@ -1,0 +1,22 @@
+{
+  "altaHttp": 201,
+  "duplicadoHttp": 409,
+  "altaSinPermisoHttp": 403,
+  "sesionNuevaCuentaHttp": 200,
+  "cuentaVisibleEnCatalogoTecnicos": true,
+  "contrasenaDerivada": true,
+  "migraciones": [
+    "010-internal-user-registration",
+    "015-internal-user-registration-history"
+  ],
+  "postgresql": {
+    "id": "5125ba58-8787-4d81-8eb4-e52a3d183bb5",
+    "username": "tecnico.hu04",
+    "name": "María Técnica Demo",
+    "role": "tecnico",
+    "active": true,
+    "actorId": "5cf77bb8-8fe1-4de3-a8f4-3cf3da000a2f",
+    "initialRole": "tecnico",
+    "registeredAt": "2026-11-26T14:19:46.196Z"
+  }
+}

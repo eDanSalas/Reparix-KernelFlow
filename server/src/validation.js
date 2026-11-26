@@ -1,12 +1,29 @@
 export class HttpError extends Error{constructor(status,message,fields){super(message);this.status=status;this.fields=fields;}}
 export const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export function validateStateTransition(body){
+function validateOrderStateInput(body, states){
  if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!['state','expectedVersion','note'].includes(k)))throw new HttpError(422,'Datos de transición no válidos.');
- if(!['En diagnóstico','Pendiente de autorización','En reparación'].includes(body.state))throw new HttpError(422,'El estado solicitado no es válido para esta operación.');
+ if(!states.includes(body.state))throw new HttpError(422,'El estado solicitado no es válido para esta operación.');
  if(!Number.isSafeInteger(body.expectedVersion)||body.expectedVersion<1||body.expectedVersion>=2147483647)throw new HttpError(422,'Consulta una versión válida de la orden.');
  const note=typeof body.note==='string'?body.note.trim().normalize('NFC'):'';
  if(note.length<3||note.length>500||/[\u0000-\u001f\u007f]/.test(note))throw new HttpError(422,'La nota requiere de 3 a 500 caracteres sin controles.');
  return {state:body.state,expectedVersion:body.expectedVersion,note};
+}
+export const validateStateTransition=body=>validateOrderStateInput(body,['En diagnóstico','Pendiente de autorización','En reparación']);
+export const validateRepairCompletion=body=>validateOrderStateInput(body,['Listo para recoger']);
+export function validateCancellation(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body) ||
+      Object.keys(body).some(field => !['expectedVersion', 'motivo'].includes(field))) {
+    throw new HttpError(422, 'Datos de cancelación no válidos.');
+  }
+  const { expectedVersion } = body;
+  if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1 || expectedVersion >= 2147483647) {
+    throw new HttpError(422, 'Consulta una versión válida de la orden.');
+  }
+  const motivo = typeof body.motivo === 'string' ? body.motivo.trim().normalize('NFC') : '';
+  if (!motivo || motivo.length > 500 || /[\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(motivo)) {
+    throw new HttpError(422, 'Captura un motivo de cancelación válido de hasta 500 caracteres.');
+  }
+  return { expectedVersion, motivo };
 }
 export function validateAssessment(body){
  const errors={};
@@ -49,4 +66,11 @@ export function validateOrder(body){
  if(!Array.isArray(body.accessories)||body.accessories.length>20||body.accessories.some(x=>typeof x!=='string'||x.trim().length<1||x.trim().length>120||/[\u0000-\u001f\u007f]/.test(x)))errors.accessories='Máximo 20 accesorios, de 1 a 120 caracteres cada uno.';
  result.accessories=Array.isArray(body.accessories)?body.accessories.filter(x=>typeof x==='string').map(x=>x.trim().normalize('NFC')):[];result.accessoriesConfirmed=true;result.physicalCheckConfirmed=true;
  if(Object.keys(errors).length)throw new HttpError(422,'Revisa los campos indicados.',errors);return result;
+}
+
+export function validateInternalUserId(userId) {
+  if (typeof userId !== 'string' || !uuidPattern.test(userId)) {
+    throw new HttpError(404, 'Cuenta interna no encontrada.');
+  }
+  return userId;
 }

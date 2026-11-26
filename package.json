@@ -23,6 +23,11 @@
     "test": "node --test server/test/unit.test.js \"server/test/*.unit.test.js\"",
     "test:integration": "node --env-file=.env --test --test-concurrency=1 server/test/integration.test.js \"server/test/*.integration.test.js\"",
     "test:hu02:browser": "node --env-file=.env --test server/test/budget-rejection.browser.js",
+    "test:hu04:browser": "node --env-file=.env --test server/test/internal-user-registration.browser.js",
+    "test:hu05:browser": "node --env-file=.env --test server/test/role-management.browser.js",
+    "test:hu06:browser": "node --env-file=.env --test server/test/internal-user-deactivation.browser.js",
+    "test:hu07:browser": "node --env-file=.env --test server/test/physical-delivery.browser.js",
+    "test:hu08:browser": "node --env-file=.env --test server/test/order-cancellation.browser.js",
     "db:migrate": "node --env-file=.env scripts/migrate.mjs",
     "user:create": "node --env-file=.env scripts/create-user.mjs",
     "package": "node scripts/package.mjs"
