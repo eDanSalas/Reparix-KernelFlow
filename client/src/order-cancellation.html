@@ -1,0 +1,22 @@
+<section class="order-cancellation" aria-label="Cancelación de la orden" [attr.aria-busy]="pending()">
+  @if (order().state === 'Cancelado') {
+    <h3>Cancelación registrada</h3>
+    <p>El equipo permanece bajo custodia del taller.</p>
+  } @else if (editing()) {
+    <form (ngSubmit)="confirm()" aria-labelledby="cancel-order-title">
+      <h3 id="cancel-order-title">Cancelar orden {{order().folio}}</h3>
+      <p>La orden quedará cancelada y el equipo seguirá bajo custodia del taller.</p>
+      @if (error()) { <p class="error" role="alert">{{error()}}</p> }
+      <label>Motivo de cancelación
+        <textarea name="motivo" [(ngModel)]="reason" rows="3" maxlength="500" required [disabled]="blocked() || pending() || needsRefresh()"></textarea>
+        <small class="muted">Escribe el motivo en un solo párrafo.</small>
+      </label>
+      <div class="cancellation-actions">
+        <button type="submit" class="destructive" [disabled]="blocked() || pending() || needsRefresh() || !reason.trim()">Confirmar cancelación</button>
+        <button type="button" class="secondary" (click)="edit(false)" [disabled]="pending()">Volver</button>
+      </div>
+    </form>
+  } @else {
+    <button type="button" class="secondary" (click)="edit(true)" [disabled]="blocked()">Cancelar orden</button>
+  }
+</section>

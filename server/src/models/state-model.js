@@ -9,7 +9,10 @@ export async function readState(db,folio,user){
  const current=latest?.assignment_id===order.assignment?.id?latest:null;
  const budget=await readBudgetStatus(db,order.id,current?.id);
  const allowedTransitions=[];let blockedReason='';
- if(order.state!=='En reparación'){
+ if(order.state==='En reparación'){
+  if(user.role==='administrador'||(user.role==='tecnico'&&ready))allowedTransitions.push('Listo para recoger');
+  else blockedReason='El técnico asignado o el responsable del taller puede marcar el equipo listo para recoger.';
+ }else if(['Recibido','En diagnóstico','Pendiente de autorización'].includes(order.state)){
   if(!ready)blockedReason='Se requiere una asignación vigente a un técnico activo.';
   else if(order.state==='Recibido')allowedTransitions.push('En diagnóstico');
   else if(order.state==='En diagnóstico'){
@@ -21,10 +24,42 @@ export async function readState(db,folio,user){
   else if(user.role==='administrador')allowedTransitions.push('En reparación');
   else blockedReason='El responsable del taller puede iniciar la reparación.';
  }
- return {folio,state:order.state,orderVersion:order.version,...meta,history,allowedTransitions,blockedReason,authorizationRecorded:budget.authorized};
+ const canCancel=order.state==='En diagnóstico'&&['recepcion','administrador'].includes(user.role);
+ return {folio,state:order.state,orderVersion:order.version,...meta,history,allowedTransitions,blockedReason,canCancel,authorizationRecorded:budget.authorized};
 }
-export async function transitionState(pool,folio,data,user,requestId){
- const db=await pool.connect();
- try{await db.query('BEGIN');await db.query('SELECT reparix.transition_order($1,$2,$3,$4,$5,$6)',[folio,user.id,data.expectedVersion,data.state,data.note,requestId]);const view=await readState(db,folio,user);await db.query('COMMIT');return view;}
- catch(error){await db.query('ROLLBACK');const status={P5001:422,P5002:404,P5003:403,P5004:409}[error.code];if(status){const e=new HttpError(status,error.message);if(error.code==='P5004'&&/^\d+$/.test(error.detail||''))e.conflict={currentVersion:Number(error.detail)};throw e;}throw error;}finally{db.release();}
+async function saveStateChange(pool, folio, user, statement, parameters) {
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    await db.query(statement, parameters);
+    const view = await readState(db, folio, user);
+    await db.query('COMMIT');
+    return view;
+  } catch (error) {
+    await db.query('ROLLBACK');
+    const status = { P5001: 422, P5002: 404, P5003: 403, P5004: 409 }[error.code];
+    if (!status) throw error;
+    const httpError = new HttpError(status, error.message);
+    if (status === 409 && /^\d+$/.test(error.detail || '')) {
+      httpError.conflict = { currentVersion: Number(error.detail) };
+    }
+    throw httpError;
+  } finally {
+    db.release();
+  }
+}
+
+export async function transitionState(pool, folio, data, user, requestId) {
+  return saveStateChange(pool, folio, user, 'SELECT reparix.transition_order($1,$2,$3,$4,$5,$6)',
+    [folio, user.id, data.expectedVersion, data.state, data.note, requestId]);
+}
+
+export async function completeRepair(pool, folio, data, user, requestId) {
+  return saveStateChange(pool, folio, user, 'SELECT reparix.complete_order_repair($1,$2,$3,$4,$5)',
+    [folio, user.id, data.expectedVersion, data.note, requestId]);
+}
+
+export async function cancelOrder(pool, folio, data, user, requestId) {
+  return saveStateChange(pool, folio, user, 'SELECT reparix.cancel_order($1,$2,$3,$4,$5)',
+    [folio, user.id, data.expectedVersion, data.motivo, requestId]);
 }

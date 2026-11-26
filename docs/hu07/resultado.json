@@ -1,0 +1,31 @@
+{
+  "listoHttp": 201,
+  "entregaEnDiagnosticoHttp": 409,
+  "entregaEnReparacionHttp": 409,
+  "confirmacionHttp": 201,
+  "reintentoHttp": 200,
+  "mismaClaveEnReintento": true,
+  "mismaEntregaEnReintento": true,
+  "migraciones": [
+    "012-physical-delivery",
+    "017-complete-order-repair"
+  ],
+  "postgresql": {
+    "entrega": {
+      "folio": "RPX-000000000001",
+      "state": "Entregado",
+      "version": 9,
+      "id": "e946a357-0ae9-47d2-aa31-26b9a1b628cf",
+      "receptor": "María Receptora Demo",
+      "evidencia": "Acuse firmado HU-07, referencia demostrativa 001",
+      "actorId": "34ab79e7-7ce3-47d3-8fb9-1da6749bf31a",
+      "recordedAt": "2026-11-26T14:45:09.792Z"
+    },
+    "movimiento": {
+      "previousState": "Listo para recoger",
+      "state": "Entregado",
+      "actorId": "34ab79e7-7ce3-47d3-8fb9-1da6749bf31a",
+      "changedAt": "2026-11-26T14:45:09.792Z"
+    }
+  }
+}

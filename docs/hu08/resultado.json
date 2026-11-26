@@ -1,0 +1,18 @@
+{
+  "cancelacionHttp": 201,
+  "estadoIncompatibleHttp": 409,
+  "sinPermisoHttp": 403,
+  "sinMotivoHttp": 422,
+  "migracion": "013-order-cancellation",
+  "folio": "RPX-000000000001",
+  "estado": "Cancelado",
+  "version": 6,
+  "entregasRegistradas": 0,
+  "postgresql": {
+    "anterior": "En diagnóstico",
+    "actual": "Cancelado",
+    "motivo": "El cliente solicitó finalizar el servicio antes de iniciar la reparación.",
+    "responsableId": "2356abe1-2fa1-4b23-8428-494943761a37",
+    "fecha": "2026-11-26T14:59:26.608503+00:00"
+  }
+}

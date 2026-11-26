@@ -30,5 +30,16 @@ try{
  await db.query('GRANT SELECT,INSERT ON reparix.budget_rejection_channels TO reparix_app');
  await db.query('GRANT EXECUTE ON FUNCTION reparix.has_budget_authorization(uuid,uuid) TO reparix_app');
  await db.query('GRANT EXECUTE ON FUNCTION reparix.transition_order(text,uuid,integer,text,text,uuid) TO reparix_app');
+ await db.query('GRANT SELECT ON reparix.internal_user_role_changes TO reparix_app');
+ await db.query('GRANT EXECUTE ON FUNCTION reparix.change_internal_user_role(uuid,text,uuid) TO reparix_app');
+ await db.query('GRANT EXECUTE ON FUNCTION reparix.register_internal_user(uuid,text,text,text,text,uuid) TO reparix_app');
+ await db.query('GRANT SELECT ON reparix.internal_user_registrations TO reparix_app');
+ await db.query('GRANT SELECT ON reparix.internal_user_deactivations TO reparix_app');
+ await db.query('GRANT EXECUTE ON FUNCTION reparix.deactivate_internal_user(uuid,uuid) TO reparix_app');
+ await db.query('GRANT EXECUTE ON FUNCTION reparix.start_internal_user_session(uuid,text,text,text) TO reparix_app');
+ await db.query('GRANT SELECT(id,order_id,receptor,evidencia,actor_id,recorded_at) ON reparix.order_deliveries TO reparix_app');
+ await db.query('GRANT EXECUTE ON FUNCTION reparix.confirm_order_delivery(text,uuid,integer,text,text,uuid,text,uuid) TO reparix_app');
+ await db.query('GRANT EXECUTE ON FUNCTION reparix.complete_order_repair(text,uuid,integer,text,uuid) TO reparix_app');
+ await db.query('GRANT EXECUTE ON FUNCTION reparix.cancel_order(text,uuid,integer,text,uuid) TO reparix_app');
  await db.query('COMMIT');console.log('Incremental migrations applied or already present; runtime role restricted by column.');
 }catch(error){await db.query('ROLLBACK');throw error;}finally{await db.end();}

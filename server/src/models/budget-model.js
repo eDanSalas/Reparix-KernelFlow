@@ -11,6 +11,7 @@ async function saveBudgetRecord(pool, folio, user, write) {
     await db.query('BEGIN');
     // Assessment revisions, assignments and state transitions use the same order lock.
     const order = await assessmentAccess(db, folio, user, { lock: true });
+    if (order.state === 'Cancelado') throw new HttpError(409, 'La orden está cancelada.');
     const { rows: [latest] } = await db.query(`
       SELECT id, revision, assignment_id FROM reparix.order_assessments
       WHERE order_id=$1 ORDER BY revision DESC LIMIT 1`, [order.id]);

@@ -1,17 +1,20 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
+import {readFile,readdir} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import pg from 'pg';
 import {assignTechnician} from '../src/models/assignment-model.js';
 import {assessmentAccess,readAssessments,saveAssessment} from '../src/models/assessment-model.js';
 import {transitionState} from '../src/models/state-model.js';
+import {registerInternalUser} from '../src/models/internal-user-model.js';
+import {readRoleChanges} from '../src/models/role-management-model.js';
 for(const [from, title] of [
  [1,'M03 actualización 001 poblada conserva ocho tablas y folio al aplicar 002/003/004'],
  [2,'M04 actualización 002 poblada conserva nueve tablas y permite registrar diagnósticos y presupuestos'],
  [3,'M05 actualización 003 poblada conserva revisiones y permite cambios de estado'],
  [7,'M06 actualización desde 007 conserva los rechazos históricos sin canal'],
+ [14,'M07 actualización desde 014 conserva las cuentas anteriores y registra la autoría de las nuevas'],
 ])test(title,async()=>{
  const withAssignment=from>=2;
  const name='reparix_test_'+randomUUID().replaceAll('-','');assert.match(name,/^reparix_test_[a-f0-9]{32}$/);
@@ -34,23 +37,50 @@ for(const [from, title] of [
   const assessment=randomUUID();
   if(from>=3){await owner.query(await readFile(new URL('../../db/003-cu03.sql',import.meta.url),'utf8'));await owner.query("INSERT INTO reparix.schema_migrations(version) VALUES('003-cu03')");const assignment=(await owner.query('SELECT id FROM reparix.order_assignments WHERE order_id=$1',[order])).rows[0].id;await owner.query("INSERT INTO reparix.order_assessments(id,order_id,assignment_id,author_id,revision,diagnosis,proposed_work,amount,currency,note) VALUES($1,$2,$3,$4,1,'Diagnóstico histórico','Trabajo histórico','45.67','MXN','Presupuesto de una orden existente')",[assessment,order,assignment,tech]);await owner.query('UPDATE reparix.orders SET version_lock=3 WHERE id=$1',[order]);}
   const rejectionId=randomUUID();
-  if(from===7){
-   for(const version of ['004-cu05','005-cu05-initial-state','006-budget-acceptance','007-repair-transition']){
-    await owner.query(await readFile(new URL(`../../db/${version}.sql`,import.meta.url),'utf8'));
-    await owner.query('INSERT INTO reparix.schema_migrations(version) VALUES($1)',[version]);
+  if(from>=7){
+   const directory=new URL('../../db/',import.meta.url);
+   for(const file of (await readdir(directory)).filter(file=>/^\d{3}-[a-z0-9-]+\.sql$/.test(file)).sort()){
+    const number=Number(file.slice(0,3));
+    if(number<4||number>from)continue;
+    await owner.query(await readFile(new URL(file,directory),'utf8'));
+    await owner.query('INSERT INTO reparix.schema_migrations(version) VALUES($1)',[file.slice(0,-4)]);
    }
    await owner.query('INSERT INTO reparix.budget_communications(order_id,assessment_id,actor_id) VALUES($1,$2,$3)',[order,assessment,actor]);
    await owner.query(`INSERT INTO reparix.order_history(id,order_id,actor_id,field,new_value,note,request_id)
      VALUES($1,$2,$3,'rechazo_presupuesto',$4,'Rechazo histórico',$5)`,[rejectionId,order,actor,assessment,randomUUID()]);
   }
+  const registrar=randomUUID(),legacyAccount=randomUUID();
+  if(from===14){
+   await owner.query(`INSERT INTO reparix.internal_users(id,username,display_name,password_hash,role)
+     VALUES($1,'admin-historico','Administración histórica','synthetic','administrador')`,[registrar]);
+   await owner.query(`SELECT * FROM reparix.register_internal_user($1,'cuenta-historica','Cuenta histórica',
+     'synthetic','recepcion',$2)`,[legacyAccount,registrar]);
+  }
   const tables=['internal_users','sessions','clients','devices','orders','received_accessories','order_history','order_requests'];
   if(withAssignment)tables.push('order_assignments');if(from>=3)tables.push('order_assessments');
-  if(from===7)tables.push('budget_communications');
+  if(from>=7)tables.push('budget_communications');
   const snapshot=async()=>{const result={};for(const table of tables)result[table]=(await owner.query(`SELECT to_jsonb(t)-'state_changed_at'-'state_changed_by' data FROM reparix.${table} t ORDER BY to_jsonb(t)::text`)).rows;result.sequence=(await owner.query('SELECT last_value,is_called FROM reparix.order_folio_seq')).rows;return result;};
   const before=await snapshot();assert(tables.every(x=>before[x].length>0));
   const migrate=spawnSync(process.execPath,['scripts/migrate.mjs'],{encoding:'utf8',env:{...process.env,OWNER_DATABASE_URL:url.href}});assert.equal(migrate.status,0,migrate.stderr);assert.deepEqual(await snapshot(),before);
   const appURL=new URL(process.env.DATABASE_URL);appURL.pathname='/'+name;pool=new pg.Pool({connectionString:appURL.href});
   const folio=(await owner.query('SELECT folio FROM reparix.orders WHERE id=$1',[order])).rows[0].folio;
+  if(from===14){
+   const legacy=await readRoleChanges(pool,legacyAccount);
+   assert.equal(legacy.account.username,'cuenta-historica');
+   assert.equal(legacy.registration,undefined);
+   const saved=await registerInternalUser(pool,{
+    username:'cuenta-nueva',name:'Cuenta nueva',password:randomUUID(),role:'tecnico',
+   },registrar);
+   const {registration}=await readRoleChanges(pool,saved.id);
+   assert.equal(registration.actorId,registrar);
+   assert.equal(registration.initialRole,'tecnico');
+   assert.ok(Number.isFinite(Date.parse(registration.registeredAt)));
+   const repeated=spawnSync(process.execPath,['scripts/migrate.mjs'],{encoding:'utf8',env:{...process.env,OWNER_DATABASE_URL:url.href}});
+   assert.equal(repeated.status,0,repeated.stderr);
+   assert.deepEqual(await readRoleChanges(pool,saved.id),{account:saved,history:[],registration});
+   assert.equal((await owner.query('SELECT 1 FROM reparix.internal_user_registrations')).rowCount,1);
+   return;
+  }
   if(from===7){
    const user={id:actor,role:'recepcion'};
    const view=await readAssessments(pool,await assessmentAccess(pool,folio,user),user);

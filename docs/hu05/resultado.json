@@ -1,0 +1,17 @@
+{
+  "cambioHttp": 201,
+  "autoescalamientoHttp": 403,
+  "catalogoTecnicosAntesHttp": 200,
+  "catalogoTecnicosDespuesHttp": 403,
+  "directorioAdministrativoHttp": 403,
+  "migracion": "009-internal-user-role-changes",
+  "postgresql": {
+    "accountId": "9ec81e49-2d99-445e-b476-03a538698a02",
+    "username": "recepcion",
+    "role": "tecnico",
+    "previousRole": "recepcion",
+    "newRole": "tecnico",
+    "actorId": "acd98021-1acf-4711-8e0b-01ce9cc7bcc4",
+    "changedAt": "2026-11-26T14:07:23.270Z"
+  }
+}

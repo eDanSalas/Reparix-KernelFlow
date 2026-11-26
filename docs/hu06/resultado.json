@@ -1,0 +1,26 @@
+{
+  "desactivacionHttp": 201,
+  "desactivacionSinPermisoHttp": 403,
+  "accesoNuevoHttp": 401,
+  "lecturaSesionAnteriorHttp": 401,
+  "escrituraSesionAnteriorHttp": 401,
+  "sesionesRestantes": 0,
+  "migraciones": [
+    "011-internal-user-deactivation",
+    "016-serialize-session-creation"
+  ],
+  "postgresql": {
+    "cuenta": {
+      "accountId": "99926e1d-a962-4e2b-ba53-41f547e2c588",
+      "username": "recepcion",
+      "active": false,
+      "actorId": "cbc4568f-6333-4767-b6cd-85ca266a42b1",
+      "changedAt": "2026-11-26T14:34:54.649Z"
+    },
+    "autoria": {
+      "folio": "RPX-000000000001",
+      "createdBy": "99926e1d-a962-4e2b-ba53-41f547e2c588",
+      "originalActor": "99926e1d-a962-4e2b-ba53-41f547e2c588"
+    }
+  }
+}
