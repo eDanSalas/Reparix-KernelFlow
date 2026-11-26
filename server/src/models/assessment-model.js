@@ -32,6 +32,16 @@ export async function readAssessments(db,order,user){
    JOIN reparix.internal_users u ON u.id=h.actor_id
    WHERE b.order_id=$1 ORDER BY h.changed_at,h.id`,[order.id]);
   result.acceptances=acceptances;
+  const {rows:rejections}=await db.query(`
+   SELECT h.id,a.id AS "assessmentId",a.revision,rc.channel,h.note AS evidence,
+     h.actor_id AS "authorId",u.display_name AS "authorName",h.changed_at AS "recordedAt"
+   FROM reparix.order_history h
+   JOIN reparix.order_assessments a ON a.order_id=h.order_id AND a.id::text=h.new_value
+   JOIN reparix.internal_users u ON u.id=h.actor_id
+   LEFT JOIN reparix.budget_rejection_channels rc ON rc.history_id=h.id
+   WHERE h.order_id=$1 AND h.field='rechazo_presupuesto'
+   ORDER BY h.changed_at DESC,h.id DESC`,[order.id]);
+  result.rejections=rejections;
  }
  return result;
 }
@@ -44,8 +54,10 @@ export async function readBudgetStatus(db,orderId,assessmentId){
   FROM reparix.budget_communications c
   LEFT JOIN reparix.budget_acceptances b USING (order_id,assessment_id)
   LEFT JOIN LATERAL (
-    SELECT jsonb_build_object('recordedAt',h.changed_at,'authorName',u.display_name,'evidence',h.note) AS rejection
+    SELECT jsonb_build_object('recordedAt',h.changed_at,'authorName',u.display_name,
+      'evidence',h.note,'channel',rc.channel) AS rejection
     FROM reparix.order_history h JOIN reparix.internal_users u ON u.id=h.actor_id
+    LEFT JOIN reparix.budget_rejection_channels rc ON rc.history_id=h.id
     WHERE h.order_id=c.order_id AND h.field='rechazo_presupuesto' AND h.new_value=c.assessment_id::text
     ORDER BY h.changed_at DESC,h.id DESC LIMIT 1
   ) r ON true

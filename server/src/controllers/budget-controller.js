@@ -25,11 +25,15 @@ export function budgetController(pool) {
     },
     reject: async (req, res) => {
       const presupuestoId = assessmentId(req);
+      const canal = typeof req.body.canal === 'string' ? req.body.canal.trim().normalize('NFC') : '';
+      if (!canal || canal.length > 80 || /[\u0000\uD800-\uDFFF]/u.test(canal)) {
+        throw new HttpError(422, 'Captura un canal de comunicación válido de hasta 80 caracteres.');
+      }
       const evidencia = typeof req.body.evidencia === 'string' ? req.body.evidencia.trim().normalize('NFC') : '';
       if (evidencia.length < 3 || evidencia.length > 500 || /[\u0000\uD800-\uDFFF]/u.test(evidencia)) {
         throw new HttpError(422, 'Captura de 3 a 500 caracteres de evidencia del rechazo.');
       }
-      res.status(201).json(await recordRejection(pool, req.params.folio, { presupuestoId, evidencia }, req.user, req.requestId));
+      res.status(201).json(await recordRejection(pool, req.params.folio, { presupuestoId, canal, evidencia }, req.user, req.requestId));
     },
   };
 }

@@ -38,7 +38,7 @@ export function recordCommunication(pool, folio, assessmentId, user) {
   });
 }
 
-export function recordRejection(pool, folio, { presupuestoId, evidencia }, user, requestId) {
+export function recordRejection(pool, folio, { presupuestoId, canal, evidencia }, user, requestId) {
   return saveBudgetRecord(pool, folio, user, async (db, order, current, status) => {
     if (current?.id !== presupuestoId || !status.communicatedAt) {
       throw new HttpError(409, 'El presupuesto debe estar vigente y haber sido comunicado al cliente.');
@@ -46,10 +46,14 @@ export function recordRejection(pool, folio, { presupuestoId, evidencia }, user,
     if (order.state === 'En reparación' || status.accepted || status.rejection) {
       throw new HttpError(409, 'No se puede rechazar una revisión con una decisión registrada o una reparación en curso.');
     }
+    const historyId = randomUUID();
     await db.query(`
       INSERT INTO reparix.order_history(id,order_id,actor_id,changed_at,field,new_value,note,request_id)
       VALUES($1,$2,$3,clock_timestamp(),'rechazo_presupuesto',$4,$5,$6)`,
-    [randomUUID(), order.id, user.id, presupuestoId, evidencia, requestId]);
+    [historyId, order.id, user.id, presupuestoId, evidencia, requestId]);
+    await db.query(`
+      INSERT INTO reparix.budget_rejection_channels(history_id,channel)
+      VALUES($1,$2)`, [historyId, canal]);
   });
 }
 

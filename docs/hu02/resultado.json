@@ -1,0 +1,18 @@
+{
+  "folio": "RPX-000000000001",
+  "revision": 2,
+  "estado": "Pendiente de autorización",
+  "custodiaSinCambios": true,
+  "registroHttp": 201,
+  "intentoReparacionHttp": 409,
+  "postgresql": {
+    "id": "881eeb30-beef-4520-a7a4-80bce21bd1ea",
+    "orderId": "3ba7e7a4-83a9-4fdd-941c-0b86f3a1f5c4",
+    "assessmentId": "371f47b4-93c8-4129-9197-dbc3a13dbe51",
+    "channel": "WhatsApp",
+    "evidence": "El cliente rechazó el presupuesto por escrito. Caso HU-02.",
+    "authorId": "10cf1a36-ac80-4c36-9183-2dc8e17618cf",
+    "recordedAt": "2026-11-26T13:55:15.013Z",
+    "requestId": "7dd8d525-80f0-4b93-8531-e630283cec75"
+  }
+}

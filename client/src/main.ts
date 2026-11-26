@@ -5,9 +5,10 @@ type Assignment={id:string;technicianId:string;technicianName:string;assignedAt:
 type Receipt={folio:string;state:string;version:number;receivedAt:string;clientName:string;phone:string;email:string|null;deviceType:string;brand:string;model:string;serialNumber:string|null;serialUnavailableReason:string|null;reportedFault:string;physicalCondition:string;accessories:string[];history:{author:string;changedAt:string}[];currentAssignment:Assignment|null;assignmentHistory:Assignment[]};
 type Assessment={id:string;revision:number;assignmentId:string;diagnosis:string;proposedWork:string;amount:string;currency:string;note:string;authorName:string;registeredAt:string};
 type BudgetAcceptance={id:string;assessmentId:string;revision:number;canal:string;evidencia:string;responsable:string;authorName:string;recordedAt:string};
-type BudgetRejection={recordedAt:string;authorName:string;evidence:string};
+type BudgetRejection={recordedAt:string;authorName:string;evidence:string;channel:string|null};
+type BudgetRejectionHistory=BudgetRejection&{id:string;assessmentId:string;revision:number};
 type BudgetAction='budget-communications'|'budget-acceptances'|'budget-rejections';
-type AssessmentView={orderVersion:number;state:string;assessments:Assessment[];currentAssessment:Assessment|null;latestAssessment:Assessment|null;authorizationRecorded:boolean;budgetRejected:boolean;communication:{recordedAt:string}|null;acceptances?:BudgetAcceptance[];rejection?:BudgetRejection|null};
+type AssessmentView={orderVersion:number;state:string;assessments:Assessment[];currentAssessment:Assessment|null;latestAssessment:Assessment|null;authorizationRecorded:boolean;budgetRejected:boolean;communication:{recordedAt:string}|null;acceptances?:BudgetAcceptance[];rejection?:BudgetRejection|null;rejections?:BudgetRejectionHistory[]};
 type StateView={folio:string;state:string;orderVersion:number;changedAt:string;changedBy:string;allowedTransitions:string[];blockedReason:string;history:{previousState:string|null;state:string;note:string;changedAt:string;author:string}[]};
 const emptyAssessment=()=>({diagnosis:'',proposedWork:'',amount:'',currency:'MXN',note:''});
 const emptyAcceptance=()=>({canal:'',evidencia:'',responsable:''});
@@ -53,7 +54,7 @@ const empty=()=>({clientName:'',phone:'',email:'',deviceType:'',brand:'',model:'
 <p>Revisión {{current.revision}} · {{current.amount}} {{current.currency}}</p>
 @if(budgetNeedsRefresh()){<p role="alert">Consulta nuevamente el folio para confirmar el resultado y revisar el presupuesto vigente.</p>}
 @if(av.communication;as communication){
-<p>Comunicación registrada el {{date(communication.recordedAt)}}.</p>
+<p>Comunicación registrada el <time [attr.datetime]="communication.recordedAt">{{date(communication.recordedAt)}}</time></p>
 @if(!av.authorizationRecorded && av.state!=='En reparación'){
 <form (ngSubmit)="saveBudget('budget-acceptances')" aria-label="Registrar aceptación del presupuesto">
 <label>Canal de confirmación<input name="acceptanceChannel" [(ngModel)]="acceptanceData.canal" maxlength="80" required [disabled]="busy()||budgetNeedsRefresh()"></label>
@@ -62,15 +63,11 @@ const empty=()=>({clientName:'',phone:'',email:'',deviceType:'',brand:'',model:'
 <button [disabled]="busy()||budgetNeedsRefresh()||!acceptanceIsComplete()">Registrar aceptación</button>
 </form>
 @if(!av.rejection){<form (ngSubmit)="saveBudget('budget-rejections')" aria-label="Registrar rechazo del presupuesto">
+<label>Canal del rechazo<input name="rejectionChannel" [(ngModel)]="rejectionChannel" maxlength="80" required [disabled]="busy()||budgetNeedsRefresh()"></label>
 <label>Evidencia del rechazo<textarea name="rejectionEvidence" [(ngModel)]="rejectionEvidence" minlength="3" maxlength="500" rows="2" required [disabled]="busy()||budgetNeedsRefresh()"></textarea></label>
-<button class="secondary" [disabled]="busy()||budgetNeedsRefresh()||rejectionEvidence.trim().length<3">Registrar rechazo</button>
+<button class="secondary" [disabled]="busy()||budgetNeedsRefresh()||!rejectionIsComplete()">Registrar rechazo</button>
 </form>}
 }
-@if(av.rejection;as rejection){<article class="assessment-history">
-<h4>Rechazo registrado para la revisión {{current.revision}}</h4>
-<p><time [attr.datetime]="rejection.recordedAt">{{date(rejection.recordedAt)}}</time> · Registrado por {{rejection.authorName}}</p>
-<p class="multiline">{{rejection.evidence}}</p>
-</article>}
 }@else{
 <p>Confirma la comunicación después de informar al cliente de esta revisión.</p>
 <button type="button" class="secondary" (click)="saveBudget('budget-communications')" [disabled]="busy()||budgetNeedsRefresh()">Registrar comunicación al cliente</button>
@@ -86,6 +83,16 @@ const empty=()=>({clientName:'',phone:'',email:'',deviceType:'',brand:'',model:'
 <p><strong>Responsable:</strong> {{a.responsable}}</p>
 </article>
 }}
+@if(av.rejections?.length){
+<h3>Historial de rechazos</h3>
+@for(rejection of av.rejections;track rejection.id){
+<article class="assessment-history">
+<h4>Revisión {{rejection.revision}} · Rechazada</h4>
+<p><time [attr.datetime]="rejection.recordedAt">{{date(rejection.recordedAt)}}</time> · Registrada por {{rejection.authorName}}</p>
+@if(rejection.channel){<p><strong>Canal:</strong> {{rejection.channel}}</p>}
+<p class="multiline"><strong>Evidencia:</strong> {{rejection.evidence}}</p>
+</article>
+}}
 }
 @if(user()?.role==='tecnico' && av.state==='En diagnóstico'){
 @if(assessmentNeedsRefresh()){<p role="alert">Consulta nuevamente el folio y comprueba las revisiones antes de confirmar otro guardado.</p>}
@@ -97,7 +104,7 @@ export class App{
  user=signal<{name:string;username:string;role:string}|null>(null);busy=signal(false);message=signal('');receipt=signal<Receipt|null>(null);errors=signal<Record<string,string>>({});locked=signal(false);
  technicalOrder=signal<Receipt|null>(null);technicians=signal<{id:string;name:string}[]>([]);assignmentNeedsRefresh=signal(false);selectedTechnician='';assignmentNote='';assignmentConfirmed=false;
  assessmentView=signal<AssessmentView|null>(null);assessmentNeedsRefresh=signal(false);assessmentData=emptyAssessment();assessmentConfirmed=false;assessmentDraftFolio='';
- budgetNeedsRefresh=signal(false);acceptanceData=emptyAcceptance();rejectionEvidence='';budgetDraftAssessment='';
+ budgetNeedsRefresh=signal(false);acceptanceData=emptyAcceptance();rejectionChannel='';rejectionEvidence='';budgetDraftAssessment='';
  stateView=signal<StateView|null>(null);stateNeedsRefresh=signal(false);targetState='';stateNote='';stateConfirmed=false;stateDraftFolio='';
  username='';password='';csrf='';data=empty();accessoriesText='';lookupFolio='';key=crypto.randomUUID();snapshot:unknown=null;
  constructor(){void this.restore();window.addEventListener('beforeunload',e=>{if(this.locked()||this.stateNeedsRefresh()){e.preventDefault();e.returnValue='';}});}
@@ -112,11 +119,15 @@ export class App{
  resetBudgetDraft(view:AssessmentView|null){
   const id=view?.currentAssessment?.id??'';
   if(id!==this.budgetDraftAssessment||view?.authorizationRecorded)this.acceptanceData=emptyAcceptance();
-  if(id!==this.budgetDraftAssessment||view?.rejection||view?.authorizationRecorded)this.rejectionEvidence='';
+  if(id!==this.budgetDraftAssessment||view?.rejection||view?.authorizationRecorded){
+   this.rejectionChannel='';
+   this.rejectionEvidence='';
+  }
   this.budgetDraftAssessment=id;
   this.budgetNeedsRefresh.set(false);
  }
  acceptanceIsComplete(){return Object.values(this.acceptanceData).every(value=>value.trim());}
+ rejectionIsComplete(){return this.rejectionChannel.trim().length>0&&this.rejectionEvidence.trim().length>=3;}
  async saveBudget(action:BudgetAction){
   const order=this.receipt(),view=this.assessmentView(),current=view?.currentAssessment;
   if(!order||!current||this.busy()||this.budgetNeedsRefresh()||this.user()?.role==='tecnico')return;
@@ -124,13 +135,15 @@ export class App{
   const rejecting=action==='budget-rejections';
   if((accepting||rejecting)&&(!view.communication||view.authorizationRecorded||view.state==='En reparación'))return;
   if(accepting&&!this.acceptanceIsComplete())return;
-  if(rejecting&&(view.rejection||this.rejectionEvidence.trim().length<3))return;
+  if(rejecting&&(view.rejection||!this.rejectionIsComplete()))return;
   this.busy.set(true);
   try{
    const updated=await this.api('/orders/'+order.folio+'/'+action,'POST',{
-    presupuestoId:current.id,...(accepting?this.acceptanceData:{}),...(rejecting?{evidencia:this.rejectionEvidence}:{}),
+    presupuestoId:current.id,...(accepting?this.acceptanceData:{}),
+    ...(rejecting?{canal:this.rejectionChannel,evidencia:this.rejectionEvidence}:{}),
    });
    this.assessmentView.set(updated);
+   if(rejecting)this.acceptanceData=emptyAcceptance();
    this.resetBudgetDraft(updated);
    if(accepting||rejecting)await this.loadStateActions(order.folio,updated.orderVersion);
    this.message.set(accepting?'Aceptación guardada en el historial.':rejecting?'Rechazo guardado en el historial.':'Comunicación del presupuesto registrada.');
