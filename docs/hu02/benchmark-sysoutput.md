@@ -12,7 +12,7 @@ Clock Cycle 2 · Benchmark & SysOutput · 26 de noviembre de 2026
 
 ## Evidencia de la rama del PR
 
-Angular compiló en modo producción sin errores ni advertencias de compilación. Pasaron 29 pruebas unitarias, 103 de integración con PostgreSQL 18.4 y el recorrido de navegador. En el árbol de trabajo de Clock Cycle 2 pasaron 123 pruebas de integración.
+Angular compiló en modo producción sin errores ni advertencias de compilación. Pasaron 29 pruebas unitarias, 103 de integración con PostgreSQL 18.4 y el recorrido de navegador. En el árbol de trabajo de Clock Cycle 2 pasaron 123 pruebas de integración. La prueba de arranque del paquete confirmó el acceso a PostgreSQL y la carga de Angular desde Express con las dependencias de producción.
 
 - [Captura del rechazo en móvil a 390 px](01-captura-movil.png)
 - [Historial en Angular después de recargar](02-historial-movil.png)
