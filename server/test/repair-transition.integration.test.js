@@ -109,13 +109,16 @@ test('HU03-02 Un presupuesto comunicado sin decisión bloquea la reparación', a
   assert.ok(!state.allowedTransitions.includes(repairState));
   assert.deepEqual((await snapshot(order)).acceptances, []);
   await assertDenied(order, state);
+  await assert.rejects(fixture.owner.query(
+    'UPDATE reparix.orders SET state=$1 WHERE id=$2', [repairState, order.order.id],
+  ), { code: '23514' });
 });
 
 test('HU03-03 Un rechazo de la revisión vigente bloquea la reparación y se conserva', async () => {
   const order = await prepare('HU03-03');
   const route = order.route + '/budget-rejections';
   const evidence = 'El cliente rechazó el importe por escrito';
-  const payload = { presupuestoId: order.current.id, evidencia: evidence };
+  const payload = { presupuestoId: order.current.id, canal: 'WhatsApp', evidencia: evidence };
   const before = await snapshot(order);
   assert.equal((await fixture.call(route, fixture.tech, payload)).status, 403);
   assert.equal((await fixture.call(route, fixture.rec, { ...payload, evidencia: '   ' })).status, 422);
@@ -207,7 +210,9 @@ test('HU03-07 Una aceptación vigente no permite saltar directamente desde diagn
 test('HU03-08 Una aceptación posterior al rechazo habilita el inicio y conserva el rechazo en el historial', async () => {
   const order = await prepare('HU03-08');
   const route = order.route + '/budget-rejections';
-  const payload = { presupuestoId: order.current.id, evidencia: 'El cliente pidió tiempo para reconsiderar' };
+  const payload = {
+    presupuestoId: order.current.id, canal: 'WhatsApp', evidencia: 'El cliente pidió tiempo para reconsiderar',
+  };
   await fixture.post(route, fixture.rec, payload);
   const accepted = await acceptCurrent(order);
   assert.equal(accepted.authorizationRecorded, true);
